@@ -12,6 +12,8 @@ import type {
 import { getDevPreviewPayload } from "./dev-preview";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const DEV_PREVIEW_ENABLED =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_PREVIEW === "true";
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const searchParams = new URLSearchParams();
@@ -48,7 +50,7 @@ const request = async <T>(path: string) => {
 
     return (await response.json()) as T;
   } catch (error) {
-    if (import.meta.env.DEV) {
+    if (DEV_PREVIEW_ENABLED) {
       const previewPayload = getDevPreviewPayload(path);
 
       if (previewPayload) {

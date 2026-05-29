@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --config wrangler.jsonc --local --persist-to .wrangler/state/v3",
+    "dev": "node ./scripts/dev-local.mjs",
     "build": "wrangler deploy --dry-run --config wrangler.jsonc",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "db:migrate:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --file ./migrations/0001_initial.sql",
-    "db:seed:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --file ./seeds/seed.sql"
+    "db:migrate:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --persist-to .wrangler/state/v3 --file ./migrations/0001_initial.sql",
+    "db:seed:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --persist-to .wrangler/state/v3 --file ./seeds/seed.sql"
   },
   "dependencies": {
     "@awesomekorea/shared": "file:../../packages/shared",

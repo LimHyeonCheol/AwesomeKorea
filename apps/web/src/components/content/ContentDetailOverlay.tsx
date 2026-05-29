@@ -15,6 +15,8 @@ interface ContentDetailOverlayProps {
   onClose: () => void;
 }
 
+const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+
 export function ContentDetailOverlay({
   contentSlug,
   isOpen,
@@ -94,6 +96,8 @@ export function ContentDetailOverlay({
     reactionResource.data?.featuredReaction ??
     detailResource.data?.featuredReaction ??
     null;
+  const canRenderInlinePlayer =
+    activeReaction !== null && YOUTUBE_VIDEO_ID_PATTERN.test(activeReaction.youtubeVideoId);
 
   return (
     <div className="detail-overlay" role="presentation" onClick={onClose}>
@@ -147,7 +151,7 @@ export function ContentDetailOverlay({
                 <span>합산 조회수 {formatCompactNumber(detailResource.data.content.totalViews)}</span>
               </div>
               <div className="detail-player">
-                {activeReaction ? (
+                {activeReaction && canRenderInlinePlayer ? (
                   <iframe
                     className="detail-player__frame"
                     src={activeReaction.embedUrl}
@@ -157,7 +161,9 @@ export function ContentDetailOverlay({
                   />
                 ) : (
                   <div className="detail-player__empty">
-                    아직 재생할 리액션 영상이 없습니다.
+                    {activeReaction
+                      ? "현재 연결된 데모 영상은 인라인 재생을 지원하지 않습니다."
+                      : "아직 재생할 리액션 영상이 없습니다."}
                   </div>
                 )}
               </div>
@@ -170,14 +176,16 @@ export function ContentDetailOverlay({
                   <div className="detail-player__stats">
                     <span>조회수 {formatCompactNumber(activeReaction.viewCount)}</span>
                     <span>{formatKoreanDate(activeReaction.publishedAt)}</span>
-                    <a
-                      className="chip-button chip-button--solid"
-                      href={activeReaction.youtubeUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      유튜브 보기
-                    </a>
+                    {canRenderInlinePlayer ? (
+                      <a
+                        className="chip-button chip-button--solid"
+                        href={activeReaction.youtubeUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        유튜브 보기
+                      </a>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

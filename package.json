@@ -1,0 +1,22 @@
+{
+  "name": "awesomekorea",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.8.2",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @awesomekorea/web",
+    "dev:api": "npm run dev --workspace @awesomekorea/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate:local": "npm run db:migrate:local --workspace @awesomekorea/api",
+    "db:seed:local": "npm run db:seed:local --workspace @awesomekorea/api"
+  }
+}

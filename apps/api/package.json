@@ -1,0 +1,23 @@
+{
+  "name": "@awesomekorea/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.jsonc --local --persist-to .wrangler/state/v3",
+    "build": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:migrate:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --file ./migrations/0001_initial.sql",
+    "db:seed:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --file ./seeds/seed.sql"
+  },
+  "dependencies": {
+    "@awesomekorea/shared": "workspace:*",
+    "hono": "4.12.23"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260529.1",
+    "@types/node": "25.9.1",
+    "typescript": "6.0.3",
+    "wrangler": "4.95.0"
+  }
+}

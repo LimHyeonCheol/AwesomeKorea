@@ -72,6 +72,11 @@ interface ReactionVideoRow {
   youtubeVideoId: string;
 }
 
+interface StoredReactionTitleRow {
+  title: string;
+  youtubeVideoId: string;
+}
+
 export interface SyncContent {
   aliases: string[];
   categoryNameKo: string;
@@ -103,6 +108,14 @@ export interface UpsertReactionVideoInput {
   youtubeUrl: string;
   youtubeVideoId: string;
 }
+
+const VALID_YOUTUBE_VIDEO_ID_LENGTH = 11;
+
+const buildYoutubeWatchUrl = (youtubeVideoId: string) =>
+  `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+
+const buildYoutubeEmbedUrl = (youtubeVideoId: string) =>
+  `https://www.youtube-nocookie.com/embed/${youtubeVideoId}?playsinline=1&rel=0&modestbranding=1`;
 
 const mapCategory = (row: CategoryRow): Category => ({
   id: toNumber(row.id),
@@ -149,8 +162,8 @@ const mapReactionVideo = (row: ReactionVideoRow): ReactionVideo => ({
   viewCount: toNumber(row.viewCount),
   likeCount: toNumber(row.likeCount),
   commentCount: toNumber(row.commentCount),
-  youtubeUrl: toStringValue(row.youtubeUrl),
-  embedUrl: `https://www.youtube.com/embed/${toStringValue(row.youtubeVideoId)}`,
+  youtubeUrl: buildYoutubeWatchUrl(toStringValue(row.youtubeVideoId)),
+  embedUrl: buildYoutubeEmbedUrl(toStringValue(row.youtubeVideoId)),
   channelName: toStringValue(row.channelName),
 });
 
@@ -178,29 +191,69 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
   const topResult = await db
     .prepare(
       `
-        WITH latest_snapshot AS (
-          SELECT MAX(snapshot_date) AS snapshot_date
-          FROM ranking_snapshots
-          WHERE rank_type = 'weekly'
+        WITH latest_window AS (
+          SELECT COALESCE(date(MAX(rv.published_at)), date('now')) AS snapshotDate
+          FROM reaction_videos rv
+          WHERE rv.is_overseas_reaction = 1
+            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+        ),
+        aggregated AS (
+          SELECT
+            c.id AS contentId,
+            cat.id AS categoryId,
+            c.slug AS contentSlug,
+            c.title_ko AS titleKo,
+            cat.slug AS categorySlug,
+            cat.name_ko AS categoryNameKo,
+            COUNT(rv.id) AS reactionCount,
+            COALESCE(SUM(rv.view_count), 0) AS totalViews,
+            c.thumbnail_url AS thumbnailUrl
+          FROM contents c
+          JOIN categories cat
+            ON cat.id = c.category_id
+          JOIN reaction_videos rv
+            ON rv.content_id = c.id
+          CROSS JOIN latest_window lw
+          WHERE c.status = 'active'
+            AND rv.is_overseas_reaction = 1
+            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+            AND date(rv.published_at) BETWEEN date(lw.snapshotDate, '-6 day') AND date(lw.snapshotDate)
+          GROUP BY
+            c.id,
+            cat.id,
+            c.slug,
+            c.title_ko,
+            cat.slug,
+            cat.name_ko,
+            c.thumbnail_url
+        ),
+        ranked AS (
+          SELECT
+            contentId,
+            categoryId,
+            contentSlug,
+            titleKo,
+            categorySlug,
+            categoryNameKo,
+            reactionCount,
+            totalViews,
+            thumbnailUrl,
+            ROW_NUMBER() OVER (
+              ORDER BY reactionCount DESC, totalViews DESC, contentId ASC
+            ) AS rank
+          FROM aggregated
         )
         SELECT
-          rs.rank_value AS rank,
-          c.slug AS contentSlug,
-          c.title_ko AS titleKo,
-          cat.slug AS categorySlug,
-          cat.name_ko AS categoryNameKo,
-          rs.reaction_count AS reactionCount,
-          rs.total_views AS totalViews,
-          c.thumbnail_url AS thumbnailUrl
-        FROM ranking_snapshots rs
-        JOIN latest_snapshot ls
-          ON rs.snapshot_date = ls.snapshot_date
-        JOIN contents c
-          ON c.id = rs.content_id
-        JOIN categories cat
-          ON cat.id = c.category_id
-        WHERE rs.rank_type = 'weekly'
-        ORDER BY rs.rank_value ASC
+          rank,
+          contentSlug,
+          titleKo,
+          categorySlug,
+          categoryNameKo,
+          reactionCount,
+          totalViews,
+          thumbnailUrl
+        FROM ranked
+        ORDER BY rank ASC
         LIMIT 10
       `,
     )
@@ -228,6 +281,7 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
         LEFT JOIN reaction_videos rv
           ON rv.content_id = c.id
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
         WHERE c.status = 'active'
         GROUP BY
           c.id,
@@ -329,6 +383,7 @@ export const getContentList = async (
         LEFT JOIN reaction_videos rv
           ON rv.content_id = c.id
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
         WHERE ${filters.join(" AND ")}
         GROUP BY
           c.id,
@@ -395,6 +450,7 @@ export const getContentBySlug = async (
         LEFT JOIN reaction_videos rv
           ON rv.content_id = c.id
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
         WHERE c.slug = ?
           AND c.status = 'active'
         GROUP BY
@@ -448,6 +504,7 @@ export const getFeaturedReactionByContentSlug = async (
           ON ch.id = rv.channel_id
         WHERE c.slug = ?
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
         ORDER BY rv.view_count DESC, rv.published_at DESC
         LIMIT 1
       `,
@@ -493,6 +550,7 @@ export const getReactionsByContentSlug = async (
           ON ch.id = rv.channel_id
         WHERE c.slug = ?
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
       `,
@@ -509,6 +567,7 @@ export const getReactionsByContentSlug = async (
           ON c.id = rv.content_id
         WHERE c.slug = ?
           AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
       `,
     )
     .bind(options.slug)
@@ -557,6 +616,65 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
     categoryNameKo: toStringValue(row.categoryNameKo),
     aliases: parseJsonArray(row.aliasesJson),
   }));
+};
+
+export const countValidReactionVideos = async (db: D1Database): Promise<number> => {
+  const row = await db
+    .prepare(
+      `
+        SELECT COUNT(*) AS total
+        FROM reaction_videos
+        WHERE is_overseas_reaction = 1
+          AND LENGTH(youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+      `,
+    )
+    .first<{ total: number }>();
+
+  return toNumber(row?.total);
+};
+
+export const getStoredReactionVideosForContent = async (
+  db: D1Database,
+  contentId: number,
+): Promise<Array<{ title: string; youtubeVideoId: string }>> => {
+  const result = await db
+    .prepare(
+      `
+        SELECT
+          title,
+          youtube_video_id AS youtubeVideoId
+        FROM reaction_videos
+        WHERE content_id = ?
+          AND is_overseas_reaction = 1
+          AND LENGTH(youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+      `,
+    )
+    .bind(contentId)
+    .all<StoredReactionTitleRow>();
+
+  return (result.results ?? []).map((row) => ({
+    title: toStringValue(row.title),
+    youtubeVideoId: toStringValue(row.youtubeVideoId),
+  }));
+};
+
+export const setReactionVideoOverseasFlag = async (
+  db: D1Database,
+  youtubeVideoId: string,
+  isOverseasReaction: boolean,
+) => {
+  await db
+    .prepare(
+      `
+        UPDATE reaction_videos
+        SET
+          is_overseas_reaction = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE youtube_video_id = ?
+      `,
+    )
+    .bind(isOverseasReaction ? 1 : 0, youtubeVideoId)
+    .run();
 };
 
 export const upsertChannel = async (

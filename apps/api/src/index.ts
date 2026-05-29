@@ -12,6 +12,7 @@ import {
   getReactionsByContentSlug,
 } from "./repositories/catalog-repository";
 import { bumpCacheVersion, withCache } from "./services/cache-service";
+import { ensureBootstrapContentData } from "./services/bootstrap-service";
 import { rebuildRankings } from "./services/ranking-service";
 import { syncYoutubeReactions } from "./services/youtube-sync-service";
 import type { AppBindings } from "./types";
@@ -71,6 +72,7 @@ app.get("/api/health", (c) =>
 );
 
 app.get("/api/categories", async (c) => {
+  await ensureBootstrapContentData(c.env);
   const categories = await getCategories(c.env.DB);
 
   return c.json({
@@ -79,6 +81,7 @@ app.get("/api/categories", async (c) => {
 });
 
 app.get("/api/home", async (c) => {
+  await ensureBootstrapContentData(c.env);
   const payload = await withCache(c.env.CONTENT_CACHE, "home", HOME_CACHE_TTL_SECONDS, () =>
     getHomePayload(c.env.DB),
   );
@@ -87,6 +90,7 @@ app.get("/api/home", async (c) => {
 });
 
 app.get("/api/contents", async (c) => {
+  await ensureBootstrapContentData(c.env);
   const category = c.req.query("category");
   const sort = parseSort(c.req.query("sort"));
   const page = clampPage(c.req.query("page"));
@@ -108,6 +112,7 @@ app.get("/api/contents", async (c) => {
 });
 
 app.get("/api/contents/:slug", async (c) => {
+  await ensureBootstrapContentData(c.env);
   const slug = c.req.param("slug");
   const payload = await withCache(
     c.env.CONTENT_CACHE,
@@ -142,6 +147,7 @@ app.get("/api/contents/:slug", async (c) => {
 });
 
 app.get("/api/contents/:slug/reactions", async (c) => {
+  await ensureBootstrapContentData(c.env);
   const slug = c.req.param("slug");
   const content = await getContentBySlug(c.env.DB, slug);
 
@@ -198,6 +204,7 @@ app.post("/internal/sync/youtube", async (c) => {
   });
 
   if (result.updatedCount > 0) {
+    await rebuildRankings(c.env.DB);
     await bumpCacheVersion(c.env.CONTENT_CACHE);
   }
 

@@ -1,4 +1,4 @@
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 
 import { MVP_CATEGORIES } from "@awesomekorea/shared";
 import type { Category, CategoryFilter, SortOrder } from "@awesomekorea/shared";
@@ -7,13 +7,11 @@ import { AppFooter } from "../components/common/AppFooter";
 import { AppHeader } from "../components/common/AppHeader";
 import { SectionHeader } from "../components/common/SectionHeader";
 import { StatusNotice } from "../components/common/StatusNotice";
-import { ContentDetailOverlay } from "../components/content/ContentDetailOverlay";
 import { CategoryToolbar } from "../components/home/CategoryToolbar";
 import { ContentGridSection } from "../components/home/ContentGridSection";
 import { HeroBanner } from "../components/home/HeroBanner";
 import { TopRankingSection } from "../components/home/TopRankingSection";
 import { useAsyncResource } from "../hooks/useAsyncResource";
-import { useContentOverlayState } from "../hooks/useContentOverlayState";
 import { apiClient } from "../lib/api-client";
 
 const fallbackCategories: Category[] = MVP_CATEGORIES.map((category, index) => ({
@@ -31,10 +29,30 @@ const scrollToSection = (sectionId: string) => {
   });
 };
 
-export function HomePage() {
-  const { activeContentSlug, closeContent, openContent } = useContentOverlayState();
+interface HomePageProps {
+  homeAnchor: string | null;
+  initialSort: SortOrder | null;
+  onOpenContent: (slug: string) => void;
+}
+
+export function HomePage({ homeAnchor, initialSort, onOpenContent }: HomePageProps) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
-  const [selectedSort, setSelectedSort] = useState<SortOrder>("popular");
+  const [selectedSort, setSelectedSort] = useState<SortOrder>(initialSort ?? "popular");
+
+  useEffect(() => {
+    startTransition(() => {
+      setSelectedCategory("all");
+      setSelectedSort(initialSort ?? "popular");
+    });
+  }, [initialSort]);
+
+  useEffect(() => {
+    if (!homeAnchor) {
+      return;
+    }
+
+    scrollToSection(homeAnchor);
+  }, [homeAnchor]);
 
   const categoryResource = useAsyncResource(() => apiClient.getCategories(), [], {
     initialData: { items: fallbackCategories },
@@ -88,7 +106,7 @@ export function HomePage() {
           <HeroBanner
             hero={homeResource.data?.hero ?? null}
             onLatestClick={handleOpenLatest}
-            onOpenContent={openContent}
+            onOpenContent={onOpenContent}
           />
 
           {homeResource.error ? (
@@ -103,7 +121,7 @@ export function HomePage() {
 
           <TopRankingSection
             items={homeResource.data?.top10 ?? []}
-            onOpenContent={openContent}
+            onOpenContent={onOpenContent}
             updatedAt={homeResource.data?.updatedAt ?? null}
           />
 
@@ -142,19 +160,13 @@ export function HomePage() {
             ) : null}
 
             {contentResource.data ? (
-              <ContentGridSection items={contentResource.data.items} onOpenContent={openContent} />
+              <ContentGridSection items={contentResource.data.items} onOpenContent={onOpenContent} />
             ) : null}
           </section>
         </div>
       </main>
 
       <AppFooter updatedAt={homeResource.data?.updatedAt ?? null} />
-
-      <ContentDetailOverlay
-        contentSlug={activeContentSlug}
-        isOpen={Boolean(activeContentSlug)}
-        onClose={closeContent}
-      />
     </div>
   );
 }

@@ -8,6 +8,8 @@ interface RankingRow {
   totalViews: number;
 }
 
+const VALID_YOUTUBE_VIDEO_ID_LENGTH = 11;
+
 const insertRankingRows = async (
   db: D1Database,
   rankType: "weekly" | "popular",
@@ -50,6 +52,7 @@ export const rebuildRankings = async (db: D1Database): Promise<InternalJobResult
         SELECT COALESCE(date(MAX(published_at)), date('now')) AS snapshotDate
         FROM reaction_videos
         WHERE is_overseas_reaction = 1
+          AND LENGTH(youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
       `,
     )
     .first<{ snapshotDate: string }>();
@@ -95,6 +98,7 @@ export const rebuildRankings = async (db: D1Database): Promise<InternalJobResult
             ON rv.content_id = c.id
           WHERE c.status = 'active'
             AND rv.is_overseas_reaction = 1
+            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
             AND date(rv.published_at) BETWEEN date(?) AND date(?)
           GROUP BY c.id, c.category_id
         ),
@@ -136,6 +140,7 @@ export const rebuildRankings = async (db: D1Database): Promise<InternalJobResult
             ON rv.content_id = c.id
           WHERE c.status = 'active'
             AND rv.is_overseas_reaction = 1
+            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
           GROUP BY c.id, c.category_id
         ),
         ranked AS (

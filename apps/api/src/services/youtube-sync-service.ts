@@ -2,6 +2,8 @@ import type { InternalJobResult } from "@awesomekorea/shared";
 
 import {
   getActiveContentsForSync,
+  getStoredReactionVideosForContent,
+  setReactionVideoOverseasFlag,
   upsertChannel,
   upsertReactionVideo,
   type SyncContent,
@@ -59,9 +61,32 @@ const REACTION_KEYWORDS = [
   "analysis",
 ];
 
-const KOREAN_CHANNEL_HINTS = ["리액션", "한국인", "korean"];
+const KOREAN_CHANNEL_HINTS = ["리액션", "한국", "korean"];
+const VALID_YOUTUBE_VIDEO_ID_LENGTH = 11;
 
 const containsKoreanCharacters = (value: string) => /[가-힣]/.test(value);
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]+/g, " ")
+    .trim();
+
+const isStrongReference = (value: string) => {
+  const normalized = normalizeText(value);
+
+  if (normalized.length === 0) {
+    return false;
+  }
+
+  if (containsKoreanCharacters(value)) {
+    return normalized.length >= 2;
+  }
+
+  return normalized.length >= 5 || normalized.split(" ").length >= 2;
+};
 
 const uniqueValues = (values: string[]) => {
   const seen = new Set<string>();
@@ -81,16 +106,46 @@ const uniqueValues = (values: string[]) => {
   return result;
 };
 
+const buildContentReferences = (content: SyncContent) =>
+  uniqueValues([content.titleKo, content.titleEn ?? "", ...content.aliases]).map(normalizeText);
+
 const buildSearchKeywords = (content: SyncContent) =>
   uniqueValues([
-    content.titleEn ? `${content.titleEn} reaction` : "",
-    content.titleEn ? `${content.titleEn} first time watching` : "",
+    content.titleEn && isStrongReference(content.titleEn) ? `${content.titleEn} reaction` : "",
+    content.titleEn && isStrongReference(content.titleEn)
+      ? `${content.titleEn} first time watching`
+      : "",
     `${content.titleKo} reaction`,
     `${content.titleKo} 해외반응`,
-    ...content.aliases.map((alias) => `${alias} reaction`),
-  ]).slice(0, 6);
+    ...content.aliases.flatMap((alias) =>
+      isStrongReference(alias) ? [`${alias} reaction`, `${alias} first time watching`] : [],
+    ),
+  ]).slice(0, 8);
 
-const inferIsOverseasReaction = (videoTitle: string, channelName: string, language: string | null) => {
+const matchesContentReference = (content: SyncContent, videoTitle: string) => {
+  const normalizedTitle = normalizeText(videoTitle);
+  const references = buildContentReferences(content);
+  const strongReferences = references.filter((reference) => isStrongReference(reference));
+  const candidateReferences = strongReferences.length > 0 ? strongReferences : references;
+
+  if (strongReferences.some((reference) => normalizedTitle.includes(reference))) {
+    return true;
+  }
+
+  const titleTokens = new Set(normalizedTitle.split(" ").filter((token) => token.length > 0));
+
+  return candidateReferences.some((reference) => {
+    const referenceTokens = reference.split(" ").filter((token) => token.length >= 3);
+
+    return referenceTokens.length > 0 && referenceTokens.every((token) => titleTokens.has(token));
+  });
+};
+
+const inferIsOverseasReaction = (
+  videoTitle: string,
+  channelName: string,
+  language: string | null,
+) => {
   const normalizedTitle = videoTitle.toLowerCase();
   const normalizedChannel = channelName.toLowerCase();
   const hasReactionKeyword = REACTION_KEYWORDS.some((keyword) => normalizedTitle.includes(keyword));
@@ -203,9 +258,27 @@ export const syncYoutubeReactions = async (
       }
 
       const videoDetails = await fetchVideoDetails(apiKey, [...discoveredVideoIds]);
+      const matchedVideoDetails = videoDetails.filter((video) =>
+        matchesContentReference(content, video.snippet?.title ?? ""),
+      );
+      const storedReactionVideos = await getStoredReactionVideosForContent(env.DB, content.id);
 
-      for (const video of videoDetails) {
+      for (const storedReaction of storedReactionVideos) {
+        if (matchesContentReference(content, storedReaction.title)) {
+          continue;
+        }
+
+        await setReactionVideoOverseasFlag(env.DB, storedReaction.youtubeVideoId, false);
+      }
+
+      for (const video of matchedVideoDetails) {
         const youtubeVideoId = video.id ?? "";
+
+        if (youtubeVideoId.length !== VALID_YOUTUBE_VIDEO_ID_LENGTH) {
+          skippedCount += 1;
+          continue;
+        }
+
         const title = video.snippet?.title ?? "";
         const channelTitle = video.snippet?.channelTitle ?? "Unknown Channel";
         const detectedLanguage =

@@ -3,7 +3,7 @@
 대한민국 콘텐츠에 대한 해외 유튜브 리액션을 카테고리별로 빠르게 탐색하는 MVP 프로젝트입니다.  
 초기 카테고리는 `영화`, `드라마`, `만화`, `노래`이며, 추후 예능/게임/스포츠 등으로 쉽게 확장할 수 있도록 설계합니다.
 
-현재 저장소는 `Phase 1.1 프로젝트 초기 세팅`과 `Phase 1.2 D1 스키마 및 시드 데이터`까지 반영된 상태입니다.
+현재 저장소는 `Phase 1.1~1.5` 기준으로 프로젝트 초기 세팅, D1 스키마/시드, YouTube sync 워커 구조, 캐시형 API, 실제 UI 연동까지 반영된 상태입니다.
 
 ## 프로젝트 목표
 
@@ -28,7 +28,7 @@
 ### 최종 선택
 
 - Frontend: `React + Vite + TypeScript`
-- UI: `Tailwind CSS`
+- UI: `외부 CSS 아키텍처 + 공통 컴포넌트`
 - API: `Hono + TypeScript`
 - DB: `Cloudflare D1`
 - Cache: `Cloudflare KV`
@@ -45,6 +45,7 @@
 4. `Hono`는 Cloudflare Workers에 최적화되어 있고 라우팅/미들웨어가 가볍다
 5. `D1`은 별도 DB 서버 운영 없이도 정렬, 필터, 집계가 가능해서 MVP에 적합
 6. `KV`로 랭킹/홈 데이터를 캐시하면 응답 속도와 API 비용을 함께 줄일 수 있음
+7. UI는 JSX 내부 인라인 스타일 대신 외부 CSS 디렉터리와 공통 컴포넌트로 유지보수성을 확보
 
 ### 선택하지 않은 안
 
@@ -108,7 +109,7 @@ MVP에서는 DB를 사용하는 쪽이 더 적합합니다.
 
 ```text
 apps/
-  web/        # React + Vite + Tailwind v4
+  web/        # React + Vite + external CSS architecture
   api/        # Hono Worker + D1 + KV
 packages/
   shared/     # 타입, 공통 유틸, DTO
@@ -137,6 +138,30 @@ docs/
 - `GET /api/contents/:slug`
 - `GET /api/contents/:slug/reactions`
 
+### Phase 1.3 완료
+
+- `POST /internal/sync/youtube` 내부 동기화 엔드포인트 추가
+- 콘텐츠별 YouTube 검색 키워드 생성 로직 추가
+- 해외 반응 판별 휴리스틱 추가
+- Worker `scheduled` 핸들러와 cron 트리거 구성
+- 랭킹 재생성 서비스 추가
+
+### Phase 1.4 완료
+
+- 홈/목록/상세/리액션 API KV 캐시 적용
+- 캐시 버전 갱신 전략 추가
+- 상세 응답에 대표 리액션과 임베드 URL 포함
+- 인라인 플레이어용 상세 응답 구조 정리
+
+### Phase 1.5 완료
+
+- 실제 API 연동 기반 홈 화면 구성
+- 카테고리/정렬 탭 동작 구현
+- 공통 `Header`, `Footer` 컴포넌트 분리
+- 외부 CSS 디렉터리 구조 생성
+- 하나의 동적 상세 오버레이 컴포넌트로 모든 콘텐츠 재사용
+- 상세 인라인 YouTube 플레이어 연결
+
 ## 빠른 시작
 
 ### 1. 의존성 설치
@@ -164,6 +189,8 @@ npm run dev:api
 npm run dev:web
 ```
 
+개발 중에는 `apps/web/vite.config.ts` 프록시 설정으로 `/api`, `/internal` 요청이 `http://127.0.0.1:8787`로 전달됩니다.
+
 ## 환경 변수
 
 `apps/api/.dev.vars.example`를 참고해 아래 값을 준비합니다.
@@ -172,6 +199,16 @@ npm run dev:web
 - `INTERNAL_API_TOKEN`
 
 `apps/api/wrangler.jsonc`의 D1/KV 식별자는 Cloudflare 실제 리소스 값으로 교체해야 합니다.
+
+웹은 필요 시 `VITE_API_BASE_URL`로 별도 API 주소를 지정할 수 있습니다.
+
+## 프론트 구조 원칙
+
+- 공통 레이아웃은 `apps/web/src/components/common`
+- 홈 전용 UI는 `apps/web/src/components/home`
+- 상세 인라인 플레이어 UI는 `apps/web/src/components/content`
+- 외부 스타일은 `apps/web/src/styles`
+- 상세 화면은 하나의 동적 오버레이 컴포넌트로 재사용
 
 ## MVP 개발 일정 제안
 
@@ -184,9 +221,10 @@ npm run dev:web
 
 ## 다음 단계
 
-- `Phase 1.3`: 실제 홈/카테고리/상세 화면에 API 연동
-- `Phase 1.4`: 콘텐츠 상세 인라인 유튜브 임베드 연결
-- `Phase 1.5`: YouTube 수집 Cron Worker와 KV 캐시 연동
+- `Phase 1.6`: Cloudflare Pages/Workers 실배포 연결
+- YouTube API 실키로 sync 검증
+- UI QA와 반응형 보정
+- 카테고리 확장 및 관리자 입력 동선 정리
 
 ## 상세 설계
 

@@ -59,12 +59,45 @@ interface RankingRow {
 }
 
 interface ReactionVideoRow {
+  channelId?: string | null;
   channelName: string;
   commentCount: number;
   id: number;
   likeCount: number;
   publishedAt: string;
   thumbnailUrl: string | null;
+  title: string;
+  viewCount: number;
+  youtubeUrl: string;
+  youtubeVideoId: string;
+}
+
+export interface SyncContent {
+  aliases: string[];
+  categoryNameKo: string;
+  id: number;
+  slug: string;
+  titleEn: string | null;
+  titleKo: string;
+}
+
+export interface UpsertChannelInput {
+  countryCode?: string | null;
+  defaultLanguage?: string | null;
+  isKoreanChannel?: boolean;
+  title: string;
+  youtubeChannelId: string;
+}
+
+export interface UpsertReactionVideoInput {
+  channelId: number;
+  commentCount: number;
+  contentId: number;
+  detectedLanguage?: string | null;
+  isOverseasReaction: boolean;
+  likeCount: number;
+  publishedAt: string;
+  thumbnailUrl?: string | null;
   title: string;
   viewCount: number;
   youtubeUrl: string;
@@ -117,6 +150,7 @@ const mapReactionVideo = (row: ReactionVideoRow): ReactionVideo => ({
   likeCount: toNumber(row.likeCount),
   commentCount: toNumber(row.commentCount),
   youtubeUrl: toStringValue(row.youtubeUrl),
+  embedUrl: `https://www.youtube.com/embed/${toStringValue(row.youtubeVideoId)}`,
   channelName: toStringValue(row.channelName),
 });
 
@@ -212,7 +246,7 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
 
   const top10 = (topResult.results ?? []).map(mapRankingItem);
   const popularItems = (popularResult.results ?? []).map(mapContentSummary);
-  const sections = [
+  const sections: HomePayload["popularByCategory"] = [
     {
       categorySlug: "all" as const,
       categoryNameKo: "전체",
@@ -389,6 +423,41 @@ export const getContentBySlug = async (
   };
 };
 
+export const getFeaturedReactionByContentSlug = async (
+  db: D1Database,
+  slug: string,
+): Promise<ReactionVideo | null> => {
+  const row = await db
+    .prepare(
+      `
+        SELECT
+          rv.id AS id,
+          rv.youtube_video_id AS youtubeVideoId,
+          rv.title AS title,
+          rv.thumbnail_url AS thumbnailUrl,
+          rv.published_at AS publishedAt,
+          rv.view_count AS viewCount,
+          rv.like_count AS likeCount,
+          rv.comment_count AS commentCount,
+          rv.youtube_url AS youtubeUrl,
+          ch.title AS channelName
+        FROM reaction_videos rv
+        JOIN contents c
+          ON c.id = rv.content_id
+        JOIN channels ch
+          ON ch.id = rv.channel_id
+        WHERE c.slug = ?
+          AND rv.is_overseas_reaction = 1
+        ORDER BY rv.view_count DESC, rv.published_at DESC
+        LIMIT 1
+      `,
+    )
+    .bind(slug)
+    .first<ReactionVideoRow>();
+
+  return row ? mapReactionVideo(row) : null;
+};
+
 export const getReactionsByContentSlug = async (
   db: D1Database,
   options: {
@@ -451,4 +520,141 @@ export const getReactionsByContentSlug = async (
     options.limit,
     toNumber(totalRow?.total),
   );
+};
+
+export const getActiveContentsForSync = async (db: D1Database): Promise<SyncContent[]> => {
+  const result = await db
+    .prepare(
+      `
+        SELECT
+          c.id AS id,
+          c.slug AS slug,
+          c.title_ko AS titleKo,
+          c.title_en AS titleEn,
+          c.aliases_json AS aliasesJson,
+          cat.name_ko AS categoryNameKo
+        FROM contents c
+        JOIN categories cat
+          ON cat.id = c.category_id
+        WHERE c.status = 'active'
+        ORDER BY cat.sort_order ASC, c.id ASC
+      `,
+    )
+    .all<{
+      aliasesJson: string | null;
+      categoryNameKo: string;
+      id: number;
+      slug: string;
+      titleEn: string | null;
+      titleKo: string;
+    }>();
+
+  return (result.results ?? []).map((row) => ({
+    id: toNumber(row.id),
+    slug: toStringValue(row.slug),
+    titleKo: toStringValue(row.titleKo),
+    titleEn: toNullableString(row.titleEn),
+    categoryNameKo: toStringValue(row.categoryNameKo),
+    aliases: parseJsonArray(row.aliasesJson),
+  }));
+};
+
+export const upsertChannel = async (
+  db: D1Database,
+  input: UpsertChannelInput,
+): Promise<number> => {
+  await db
+    .prepare(
+      `
+        INSERT INTO channels (
+          youtube_channel_id,
+          title,
+          country_code,
+          default_language,
+          is_korean_channel
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(youtube_channel_id) DO UPDATE SET
+          title = excluded.title,
+          country_code = COALESCE(excluded.country_code, channels.country_code),
+          default_language = COALESCE(excluded.default_language, channels.default_language),
+          is_korean_channel = excluded.is_korean_channel
+      `,
+    )
+    .bind(
+      input.youtubeChannelId,
+      input.title,
+      input.countryCode ?? null,
+      input.defaultLanguage ?? null,
+      input.isKoreanChannel ? 1 : 0,
+    )
+    .run();
+
+  const row = await db
+    .prepare(
+      `
+        SELECT id
+        FROM channels
+        WHERE youtube_channel_id = ?
+      `,
+    )
+    .bind(input.youtubeChannelId)
+    .first<{ id: number }>();
+
+  return toNumber(row?.id);
+};
+
+export const upsertReactionVideo = async (
+  db: D1Database,
+  input: UpsertReactionVideoInput,
+): Promise<void> => {
+  await db
+    .prepare(
+      `
+        INSERT INTO reaction_videos (
+          youtube_video_id,
+          content_id,
+          channel_id,
+          title,
+          thumbnail_url,
+          published_at,
+          view_count,
+          like_count,
+          comment_count,
+          detected_language,
+          is_overseas_reaction,
+          youtube_url,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(youtube_video_id) DO UPDATE SET
+          content_id = excluded.content_id,
+          channel_id = excluded.channel_id,
+          title = excluded.title,
+          thumbnail_url = excluded.thumbnail_url,
+          published_at = excluded.published_at,
+          view_count = excluded.view_count,
+          like_count = excluded.like_count,
+          comment_count = excluded.comment_count,
+          detected_language = excluded.detected_language,
+          is_overseas_reaction = excluded.is_overseas_reaction,
+          youtube_url = excluded.youtube_url,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+    )
+    .bind(
+      input.youtubeVideoId,
+      input.contentId,
+      input.channelId,
+      input.title,
+      input.thumbnailUrl ?? null,
+      input.publishedAt,
+      input.viewCount,
+      input.likeCount,
+      input.commentCount,
+      input.detectedLanguage ?? null,
+      input.isOverseasReaction ? 1 : 0,
+      input.youtubeUrl,
+    )
+    .run();
 };

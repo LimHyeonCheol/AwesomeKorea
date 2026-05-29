@@ -1,6 +1,7 @@
 import type { CategorySlug } from "../constants/categories";
 
 export type SortOrder = "popular" | "latest";
+export type CategoryFilter = CategorySlug | "all";
 
 export interface Category {
   id: number;
@@ -39,6 +40,7 @@ export interface ReactionVideo {
   likeCount: number;
   commentCount: number;
   youtubeUrl: string;
+  embedUrl: string;
   channelName: string;
 }
 
@@ -80,4 +82,30 @@ export interface PaginatedResponse<T> {
   limit: number;
   total: number;
   totalPages: number;
+}
+
+export interface ContentDetailPayload {
+  content: ContentDetail;
+  featuredReaction: ReactionVideo | null;
+  availableSorts: SortOrder[];
+}
+
+export interface ReactionListPayload extends PaginatedResponse<ReactionVideo> {
+  content: {
+    slug: string;
+    titleKo: string;
+    categoryNameKo: string;
+  };
+  featuredReaction: ReactionVideo | null;
+  sort: SortOrder;
+}
+
+export interface InternalJobResult {
+  success: boolean;
+  processedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  summary: string;
+  errors: string[];
+  snapshotDate?: string;
 }

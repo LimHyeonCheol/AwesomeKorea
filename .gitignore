@@ -2,8 +2,10 @@ node_modules/
 dist/
 .wrangler/
 .vite/
+.tooling/
 coverage/
 *.log
+*.tsbuildinfo
 .env
 .env.*
 .dev.vars

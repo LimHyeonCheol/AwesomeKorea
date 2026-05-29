@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
-    "@awesomekorea/shared": "workspace:*",
+    "@awesomekorea/shared": "file:../../packages/shared",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },

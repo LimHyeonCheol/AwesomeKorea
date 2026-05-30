@@ -20,7 +20,25 @@ import type { AppBindings } from "./types";
 const app = new Hono<AppBindings>();
 
 app.use("/api/*", cors());
-app.use("/internal/*", cors());
+
+const applySecurityHeaders = (headers: Headers) => {
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=()");
+};
+
+const createSecurityHeaderRecord = () => ({
+  "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+});
+
+app.use("*", async (c, next) => {
+  await next();
+  applySecurityHeaders(c.res.headers);
+});
 
 const HOME_CACHE_TTL_SECONDS = 60 * 10;
 const CONTENT_LIST_CACHE_TTL_SECONDS = 60 * 10;
@@ -34,12 +52,27 @@ const assertInternalToken = (c: {
   };
 }) => {
   const expectedToken = c.env.INTERNAL_API_TOKEN;
+  const appEnv = c.env.APP_ENV ?? "local";
 
   if (!expectedToken) {
+    if (appEnv !== "local") {
+      throw new HTTPException(503, {
+        message: "운영 내부 API 토큰이 설정되지 않았습니다.",
+      });
+    }
+
     return;
   }
 
-  const providedToken = c.req.header("Authorization")?.replace("Bearer ", "");
+  const authorizationHeader = c.req.header("Authorization");
+
+  if (!authorizationHeader?.startsWith("Bearer ")) {
+    throw new HTTPException(401, {
+      message: "내부 API 토큰이 필요합니다.",
+    });
+  }
+
+  const providedToken = authorizationHeader.slice("Bearer ".length);
 
   if (providedToken !== expectedToken) {
     throw new HTTPException(401, {
@@ -59,7 +92,7 @@ app.get("/", (c) =>
   c.json({
     service: "awesomekorea-api",
     status: "ok",
-    phase: ["1.1", "1.2", "1.3", "1.4", "1.5"],
+    phase: ["1.1", "1.2", "1.3", "1.4", "1.5", "1.6"],
   }),
 );
 
@@ -193,6 +226,7 @@ app.get("/api/contents/:slug/reactions", async (c) => {
 
 app.post("/internal/sync/youtube", async (c) => {
   assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
 
   const contentSlug = c.req.query("contentSlug") ?? undefined;
   const maxContentsQuery = c.req.query("maxContents");
@@ -215,6 +249,7 @@ app.post("/internal/sync/youtube", async (c) => {
 
 app.post("/internal/rankings/rebuild", async (c) => {
   assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
 
   const result = await rebuildRankings(c.env.DB);
   await bumpCacheVersion(c.env.CONTENT_CACHE);
@@ -223,12 +258,15 @@ app.post("/internal/rankings/rebuild", async (c) => {
 });
 
 app.onError((error, c) => {
+  const headers = createSecurityHeaderRecord();
+
   if (error instanceof HTTPException) {
     return c.json(
       {
         message: error.message,
       },
       error.status,
+      headers,
     );
   }
 
@@ -239,6 +277,7 @@ app.onError((error, c) => {
       message: "예상하지 못한 오류가 발생했습니다.",
     },
     500,
+    headers,
   );
 });
 

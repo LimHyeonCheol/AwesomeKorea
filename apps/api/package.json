@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node ./scripts/dev-local.mjs",
+    "sync:key": "node ./scripts/sync-youtube-key.mjs",
+    "deploy": "node ./scripts/deploy.mjs",
+    "deploy:config": "node ./scripts/build-production-config.mjs",
     "build": "wrangler deploy --dry-run --config wrangler.jsonc",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:migrate:local": "wrangler d1 execute awesome-korea --config wrangler.jsonc --local --persist-to .wrangler/state/v3 --file ./migrations/0001_initial.sql",

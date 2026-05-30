@@ -183,13 +183,15 @@ npm run db:seed:local
 npm run dev:api
 ```
 
+`docs/apikey.txt` 또는 저장소 루트의 `apikey.txt`가 있으면 `npm run dev:api` 실행 시 `apps/api/.dev.vars`로 자동 동기화됩니다.
+
 ### 4. 웹 실행
 
 ```bash
 npm run dev:web
 ```
 
-개발 중에는 `apps/web/vite.config.ts` 프록시 설정으로 `/api`, `/internal` 요청이 `http://127.0.0.1:8787`로 전달됩니다.
+개발 중에는 `apps/web/vite.config.ts` 프록시 설정으로 `/api`, `/internal` 요청이 `http://127.0.0.1:9000`로 전달됩니다.
 
 ## 환경 변수
 
@@ -198,9 +200,89 @@ npm run dev:web
 - `YOUTUBE_API_KEY`
 - `INTERNAL_API_TOKEN`
 
+로컬 개발은 `npm run dev:api` 또는 `npm run sync:api-key` 실행 시 `docs/apikey.txt`, `apikey.txt`, `YOUTUBE_API_KEY_FILE`, `YOUTUBE_API_KEY` 순서로 값을 찾아 `apps/api/.dev.vars`에 자동 반영합니다.
+
+API 배포는 `npm run deploy:api`로 진행하면 `YOUTUBE_API_KEY`를 Cloudflare Worker secret으로 먼저 동기화한 뒤 바로 `wrangler deploy`까지 이어집니다.
+
 `apps/api/wrangler.jsonc`의 D1/KV 식별자는 Cloudflare 실제 리소스 값으로 교체해야 합니다.
 
 웹은 필요 시 `VITE_API_BASE_URL`로 별도 API 주소를 지정할 수 있습니다.
+
+## 실배포 방법
+
+### 1. Cloudflare 리소스 준비
+
+최초 1회만 아래 명령으로 실제 D1/KV 리소스를 생성합니다.
+
+```bash
+wrangler d1 create awesome-korea
+wrangler kv namespace create awesomekorea-content-cache
+```
+
+출력된 식별자를 환경 변수로 준비합니다.
+
+- `CLOUDFLARE_D1_ID`
+- `CLOUDFLARE_KV_ID`
+- 선택: `CLOUDFLARE_D1_PREVIEW_ID`
+- 선택: `CLOUDFLARE_KV_PREVIEW_ID`
+
+`preview` 값이 따로 없으면 배포 스크립트가 운영 ID와 같은 값으로 채웁니다.
+
+### 2. API Worker 배포
+
+아래 값 중 하나로 YouTube 키를 준비합니다.
+
+- `YOUTUBE_API_KEY`
+- `YOUTUBE_API_KEY_FILE`
+- 저장소 루트 `apikey.txt`
+- `docs/apikey.txt`
+
+내부 배치 API용 토큰은 아래 중 하나로 준비합니다.
+
+- `INTERNAL_API_TOKEN`
+- 기존 `apps/api/.dev.vars`
+- 미지정 시 배포 스크립트가 강한 랜덤 토큰을 생성해 `apps/api/.dev.vars`에 저장
+
+그 다음 API를 배포합니다.
+
+```bash
+npm run deploy:api
+```
+
+배포 스크립트는 아래를 자동으로 처리합니다.
+
+- 로컬 `YOUTUBE_API_KEY` 동기화
+- Worker secret `YOUTUBE_API_KEY` 업로드
+- Worker secret `INTERNAL_API_TOKEN` 업로드
+- `.wrangler/deploy.production.jsonc` 임시 설정 생성
+- `APP_ENV=production` 기준 Worker 배포
+
+### 3. Pages 웹 배포
+
+API 배포 후 출력된 Worker URL을 `VITE_API_BASE_URL`로 지정합니다.
+
+```bash
+VITE_API_BASE_URL=https://awesomekorea-api.<your-subdomain>.workers.dev
+npm run deploy:web
+```
+
+선택 환경 변수:
+
+- `AWESOMEKOREA_PAGES_PROJECT`
+  - 기본값: `awesomekorea-web`
+- `AWESOMEKOREA_PAGES_BRANCH`
+  - 기본값: `main`
+
+웹 배포 스크립트는 프로젝트가 없으면 자동 생성 후 `dist`를 Cloudflare Pages에 업로드합니다.
+
+### 4. 배포 검증
+
+배포가 끝나면 아래를 확인합니다.
+
+1. Worker 헬스체크: `GET https://<worker-url>/api/health`
+2. Pages 접속: `https://<pages-project>.pages.dev`
+3. 홈 화면 카드/랭킹 로딩
+4. 콘텐츠 상세 진입 후 인라인 YouTube 플레이어 렌더링
 
 ## 프론트 구조 원칙
 

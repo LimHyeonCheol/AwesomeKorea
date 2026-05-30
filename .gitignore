@@ -9,4 +9,7 @@ coverage/
 .env
 .env.*
 .dev.vars
+/.cf-api-token
+/apikey.txt
+/docs/apikey.txt
 .DS_Store

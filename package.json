@@ -14,6 +14,9 @@
   "scripts": {
     "dev:web": "npm run dev --workspace @awesomekorea/web",
     "dev:api": "npm run dev --workspace @awesomekorea/api",
+    "sync:api-key": "npm run sync:key --workspace @awesomekorea/api",
+    "deploy:api": "npm run deploy --workspace @awesomekorea/api",
+    "deploy:web": "npm run deploy --workspace @awesomekorea/web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate:local": "npm run db:migrate:local --workspace @awesomekorea/api",

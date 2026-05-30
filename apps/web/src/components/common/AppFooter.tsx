@@ -15,15 +15,15 @@ export function AppFooter({ updatedAt }: AppFooterProps) {
     <footer className="site-footer">
       <div className="site-footer__inner">
         <div>
-          <p className="site-footer__title">AwesomeKorea MVP</p>
+          <p className="site-footer__title">AwesomeKorea</p>
           <p className="site-footer__copy">
-            대한민국 콘텐츠의 해외 유튜브 반응을 카테고리별로 빠르게 정리하는 Cloudflare
-            네이티브 서비스
+            지금 반응이 큰 한국 콘텐츠를 더 빠르게 찾고, 마음에 드는 해외 리액션은 바로 이어서
+            감상해보세요.
           </p>
         </div>
         <div className="site-footer__meta">
           <span>마지막 갱신 {formatUpdatedAt(updatedAt)}</span>
-          <span>Workers · D1 · KV · React/Vite</span>
+          <span className="site-footer__version">배포 버전 {__APP_DEPLOY_VERSION__}</span>
         </div>
       </div>
     </footer>

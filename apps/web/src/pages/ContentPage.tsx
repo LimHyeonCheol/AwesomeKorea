@@ -9,14 +9,12 @@ import { StatusNotice } from "../components/common/StatusNotice";
 import { ReactionListItem } from "../components/content/ReactionListItem";
 import { useAsyncResource } from "../hooks/useAsyncResource";
 import { apiClient } from "../lib/api-client";
-import { formatCompactNumber, formatKoreanDate } from "../lib/formatters";
+import { formatCompactNumber } from "../lib/formatters";
 
 interface ContentPageProps {
   contentSlug: string;
   onNavigateHome: (options?: { anchor?: string | null; sort?: SortOrder | null }) => void;
 }
-
-const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
 export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
   const [selectedSort, setSelectedSort] = useState<SortOrder>("popular");
@@ -45,28 +43,18 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
   }, [contentSlug]);
 
   useEffect(() => {
-    if (activeVideoId) {
+    if (!activeVideoId || !reactionResource.data) {
       return;
     }
 
-    const nextVideo =
-      reactionResource.data?.featuredReaction ??
-      reactionResource.data?.items[0] ??
-      detailResource.data?.featuredReaction ??
-      null;
+    const hasActiveReaction = reactionResource.data.items.some(
+      (reaction) => reaction.youtubeVideoId === activeVideoId,
+    );
 
-    if (nextVideo) {
-      setActiveVideoId(nextVideo.youtubeVideoId);
+    if (!hasActiveReaction) {
+      setActiveVideoId(null);
     }
-  }, [activeVideoId, detailResource.data, reactionResource.data]);
-
-  const activeReaction =
-    reactionResource.data?.items.find((item) => item.youtubeVideoId === activeVideoId) ??
-    reactionResource.data?.featuredReaction ??
-    detailResource.data?.featuredReaction ??
-    null;
-  const canRenderInlinePlayer =
-    activeReaction !== null && YOUTUBE_VIDEO_ID_PATTERN.test(activeReaction.youtubeVideoId);
+  }, [activeVideoId, reactionResource.data]);
 
   return (
     <div className="app-shell">
@@ -95,7 +83,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
             {detailResource.isLoading && !detailResource.data ? (
               <StatusNotice
                 title="상세 정보를 불러오는 중"
-                description="선택한 콘텐츠의 메타 데이터와 대표 영상을 정리하고 있습니다."
+                description="선택한 콘텐츠의 메타 데이터와 대표 반응 목록을 정리하고 있습니다."
               />
             ) : null}
 
@@ -117,14 +105,14 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                     title={detailResource.data.content.titleKo}
                     description={
                       detailResource.data.content.description ??
-                      "선택한 콘텐츠의 대표 리액션과 최신 반응 영상을 한 페이지에서 확인합니다."
+                      "관련 리액션 행을 누르면 바로 아래에서 영상을 펼쳐 볼 수 있습니다."
                     }
                   />
                 </div>
 
                 <div className="detail-panel__content">
-                  <div className="detail-hero-card">
-                    <div className="detail-hero-card__meta">
+                  <div className="detail-summary-card">
+                    <div className="detail-summary-card__meta">
                       <span className="detail-badge">{detailResource.data.content.categoryNameKo}</span>
                       <span>
                         {detailResource.data.content.releaseYear ?? "미정"} · 리액션{" "}
@@ -135,45 +123,14 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                       </span>
                     </div>
 
-                    <div className="detail-player">
-                      {activeReaction && canRenderInlinePlayer ? (
-                        <iframe
-                          className="detail-player__frame"
-                          src={activeReaction.embedUrl}
-                          title={activeReaction.title}
-                          loading="lazy"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="detail-player__empty">
-                          {activeReaction
-                            ? "현재 선택한 영상은 인라인 재생을 지원하지 않아 원본 링크로 열어야 합니다."
-                            : "아직 재생할 리액션 영상이 없습니다."}
-                        </div>
-                      )}
-                    </div>
-
-                    {activeReaction ? (
-                      <div className="detail-player__summary">
-                        <div>
-                          <p className="detail-player__title">{activeReaction.title}</p>
-                          <p className="detail-player__channel">{activeReaction.channelName}</p>
-                        </div>
-                        <div className="detail-player__stats">
-                          <span>조회수 {formatCompactNumber(activeReaction.viewCount)}</span>
-                          <span>{formatKoreanDate(activeReaction.publishedAt)}</span>
-                          <a
-                            className="chip-button chip-button--solid"
-                            href={activeReaction.youtubeUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            유튜브 원본 보기
-                          </a>
-                        </div>
-                      </div>
-                    ) : null}
+                    <p className="detail-summary-card__description">
+                      {detailResource.data.content.description ??
+                        "해외 채널들이 어떤 포인트에서 반응하는지, 대표 리액션 행을 펼치며 바로 비교할 수 있습니다."}
+                    </p>
+                    <p className="detail-summary-card__hint">
+                      관련 리액션 한 칸 전체를 누르거나 제목 영역, 재생 버튼 위치를 눌러도 같은 방식으로
+                      영상이 펼쳐집니다.
+                    </p>
                   </div>
 
                   <section className="detail-list-section">
@@ -181,7 +138,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                       <SectionHeader
                         eyebrow="Reaction Feed"
                         title="관련 리액션"
-                        description="정렬만 바꿔가며 같은 상세 화면 안에서 동적으로 다시 불러옵니다."
+                        description="상단 고정 플레이어 대신, 선택한 행 바로 아래에서 영상을 펼쳐서 비교합니다."
                       />
                       <div className="sort-toggle" role="tablist" aria-label="리액션 정렬">
                         <button
@@ -222,13 +179,26 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                       />
                     ) : null}
 
+                    {reactionResource.data && reactionResource.data.items.length === 0 ? (
+                      <StatusNotice
+                        title="표시할 리액션이 없습니다"
+                        description="조건에 맞는 해외 리액션 영상이 아직 수집되지 않았습니다."
+                      />
+                    ) : null}
+
                     <div className="reaction-list">
                       {reactionResource.data?.items.map((reaction) => (
                         <ReactionListItem
                           key={reaction.youtubeVideoId}
-                          isActive={reaction.youtubeVideoId === activeReaction?.youtubeVideoId}
+                          isExpanded={reaction.youtubeVideoId === activeVideoId}
                           reaction={reaction}
-                          onPlay={() => setActiveVideoId(reaction.youtubeVideoId)}
+                          onToggle={() =>
+                            setActiveVideoId((currentVideoId) =>
+                              currentVideoId === reaction.youtubeVideoId
+                                ? null
+                                : reaction.youtubeVideoId,
+                            )
+                          }
                         />
                       ))}
                     </div>
@@ -240,7 +210,13 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
         </div>
       </main>
 
-      <AppFooter updatedAt={detailResource.data?.content.latestReactionAt ?? null} />
+      <AppFooter
+        updatedAt={
+          detailResource.data?.content.latestReactionAt ??
+          reactionResource.data?.items[0]?.publishedAt ??
+          null
+        }
+      />
     </div>
   );
 }

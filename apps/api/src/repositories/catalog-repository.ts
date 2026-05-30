@@ -80,6 +80,7 @@ interface StoredReactionTitleRow {
 export interface SyncContent {
   aliases: string[];
   categoryNameKo: string;
+  categorySlug: CategorySlug;
   id: number;
   slug: string;
   titleEn: string | null;
@@ -591,6 +592,7 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
           c.title_ko AS titleKo,
           c.title_en AS titleEn,
           c.aliases_json AS aliasesJson,
+          cat.slug AS categorySlug,
           cat.name_ko AS categoryNameKo
         FROM contents c
         JOIN categories cat
@@ -602,6 +604,7 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
     .all<{
       aliasesJson: string | null;
       categoryNameKo: string;
+      categorySlug: CategorySlug;
       id: number;
       slug: string;
       titleEn: string | null;
@@ -613,6 +616,7 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
     slug: toStringValue(row.slug),
     titleKo: toStringValue(row.titleKo),
     titleEn: toNullableString(row.titleEn),
+    categorySlug: row.categorySlug,
     categoryNameKo: toStringValue(row.categoryNameKo),
     aliases: parseJsonArray(row.aliasesJson),
   }));

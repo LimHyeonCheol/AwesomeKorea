@@ -43,7 +43,6 @@ export const ensureBootstrapContentData = async (env: AppBindings["Bindings"]) =
   await markBootstrapAttempt(env.CONTENT_CACHE);
 
   const syncResult = await syncYoutubeReactions(env, {
-    maxContents: 8,
     limitPerKeyword: 5,
   });
 

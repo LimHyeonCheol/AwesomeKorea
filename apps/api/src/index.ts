@@ -195,7 +195,8 @@ app.post("/internal/sync/youtube", async (c) => {
   assertInternalToken(c);
 
   const contentSlug = c.req.query("contentSlug") ?? undefined;
-  const maxContents = clampLimit(c.req.query("maxContents"), 8, 20);
+  const maxContentsQuery = c.req.query("maxContents");
+  const maxContents = maxContentsQuery ? clampLimit(maxContentsQuery, 12, 50) : undefined;
   const limitPerKeyword = clampLimit(c.req.query("limitPerKeyword"), 5, 10);
   const result = await syncYoutubeReactions(c.env, {
     contentSlug,
@@ -247,7 +248,6 @@ const worker: ExportedHandler<AppBindings["Bindings"]> = {
     ctx.waitUntil(
       (async () => {
         const syncResult = await syncYoutubeReactions(env, {
-          maxContents: 8,
           limitPerKeyword: 5,
         });
         const rankingResult = await rebuildRankings(env.DB);

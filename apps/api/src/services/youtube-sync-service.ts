@@ -8,6 +8,11 @@ import {
   upsertReactionVideo,
   type SyncContent,
 } from "../repositories/catalog-repository";
+import {
+  buildSearchKeywords,
+  containsKoreanCharacters,
+  matchesContentReference,
+} from "./youtube-reaction-matcher";
 
 interface YouTubeSearchItem {
   id?: {
@@ -64,30 +69,6 @@ const REACTION_KEYWORDS = [
 const KOREAN_CHANNEL_HINTS = ["리액션", "한국", "korean"];
 const VALID_YOUTUBE_VIDEO_ID_LENGTH = 11;
 
-const containsKoreanCharacters = (value: string) => /[가-힣]/.test(value);
-
-const normalizeText = (value: string) =>
-  value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9가-힣]+/g, " ")
-    .trim();
-
-const isStrongReference = (value: string) => {
-  const normalized = normalizeText(value);
-
-  if (normalized.length === 0) {
-    return false;
-  }
-
-  if (containsKoreanCharacters(value)) {
-    return normalized.length >= 2;
-  }
-
-  return normalized.length >= 5 || normalized.split(" ").length >= 2;
-};
-
 const uniqueValues = (values: string[]) => {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -104,41 +85,6 @@ const uniqueValues = (values: string[]) => {
   }
 
   return result;
-};
-
-const buildContentReferences = (content: SyncContent) =>
-  uniqueValues([content.titleKo, content.titleEn ?? "", ...content.aliases]).map(normalizeText);
-
-const buildSearchKeywords = (content: SyncContent) =>
-  uniqueValues([
-    content.titleEn && isStrongReference(content.titleEn) ? `${content.titleEn} reaction` : "",
-    content.titleEn && isStrongReference(content.titleEn)
-      ? `${content.titleEn} first time watching`
-      : "",
-    `${content.titleKo} reaction`,
-    `${content.titleKo} 해외반응`,
-    ...content.aliases.flatMap((alias) =>
-      isStrongReference(alias) ? [`${alias} reaction`, `${alias} first time watching`] : [],
-    ),
-  ]).slice(0, 8);
-
-const matchesContentReference = (content: SyncContent, videoTitle: string) => {
-  const normalizedTitle = normalizeText(videoTitle);
-  const references = buildContentReferences(content);
-  const strongReferences = references.filter((reference) => isStrongReference(reference));
-  const candidateReferences = strongReferences.length > 0 ? strongReferences : references;
-
-  if (strongReferences.some((reference) => normalizedTitle.includes(reference))) {
-    return true;
-  }
-
-  const titleTokens = new Set(normalizedTitle.split(" ").filter((token) => token.length > 0));
-
-  return candidateReferences.some((reference) => {
-    const referenceTokens = reference.split(" ").filter((token) => token.length >= 3);
-
-    return referenceTokens.length > 0 && referenceTokens.every((token) => titleTokens.has(token));
-  });
 };
 
 const inferIsOverseasReaction = (
@@ -183,7 +129,7 @@ const fetchVideoIdsForKeyword = async (
     type: "video",
     maxResults: String(limit),
     q: query,
-    order: "date",
+    order: "relevance",
   }).toString();
 
   const response = await fetchJson<YouTubeSearchResponse>(url);
@@ -235,7 +181,7 @@ export const syncYoutubeReactions = async (
   const activeContents = await getActiveContentsForSync(env.DB);
   const targetContents = activeContents
     .filter((content) => !options.contentSlug || content.slug === options.contentSlug)
-    .slice(0, options.maxContents ?? 8);
+    .slice(0, options.maxContents ?? activeContents.length);
 
   let processedCount = 0;
   let updatedCount = 0;

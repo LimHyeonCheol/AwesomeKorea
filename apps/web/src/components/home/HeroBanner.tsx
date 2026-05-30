@@ -28,12 +28,21 @@ interface HeroBannerProps {
   slides: HeroBannerSlide[];
 }
 
+const isEmbeddableReaction = (reaction: ReactionVideo) =>
+  YOUTUBE_VIDEO_ID_PATTERN.test(reaction.youtubeVideoId);
+
+const getAutoplayEmbedUrl = (reaction: ReactionVideo) => {
+  const separator = reaction.embedUrl.includes("?") ? "&" : "?";
+
+  return `${reaction.embedUrl}${separator}autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`;
+};
+
 const getReactionThumbnailUrl = (reaction: ReactionVideo) => {
   if (reaction.thumbnailUrl) {
     return reaction.thumbnailUrl;
   }
 
-  if (!YOUTUBE_VIDEO_ID_PATTERN.test(reaction.youtubeVideoId)) {
+  if (!isEmbeddableReaction(reaction)) {
     return null;
   }
 
@@ -92,10 +101,10 @@ export function HeroBanner({
           <div className="hero-banner__copy">
             <span className="hero-banner__live-badge">추천 리액션</span>
             <h1 className="hero-banner__title">
-              관심 있는 한국 콘텐츠의 대표 반응을 메인에서 바로 살펴볼 수 있게 준비하고 있습니다.
+              관심 있는 한국 콘텐츠의 대표 반응을 메인에서 바로 훑어볼 수 있게 준비하고 있습니다.
             </h1>
             <p className="hero-banner__description">
-              상단 대표 섹션에서는 자동으로 넘겨보는 추천 리액션과 함께, 바로 상세 페이지로
+              상단 대표 섹션에서는 자동으로 넘어가는 추천 리액션과 함께, 바로 상세 페이지로
               이어지는 탐색 흐름을 제공합니다.
             </p>
             <div className="hero-banner__actions">
@@ -170,19 +179,23 @@ export function HeroBanner({
 
       <div className="hero-banner__stage">
         <div className="hero-banner__media">
-          {getReactionThumbnailUrl(activeSlide.primaryReaction) ? (
-            <img
-              className="hero-banner__poster"
-              src={getReactionThumbnailUrl(activeSlide.primaryReaction) ?? ""}
-              alt={`${activeSlide.primaryReaction.title} 썸네일`}
+          {isEmbeddableReaction(activeSlide.primaryReaction) ? (
+            <iframe
+              key={activeSlide.primaryReaction.youtubeVideoId}
+              className="hero-banner__frame"
+              src={getAutoplayEmbedUrl(activeSlide.primaryReaction)}
+              title={activeSlide.primaryReaction.title}
               loading="eager"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
             />
           ) : (
             <div className="hero-banner__placeholder">
               <div className="hero-banner__placeholder-inner">
                 <p className="hero-banner__placeholder-title">{activeSlide.contentTitle}</p>
                 <p className="hero-banner__placeholder-copy">
-                  현재 데이터에서는 대표 썸네일을 불러올 수 없어 추천 반응 설명만 먼저 보여드립니다.
+                  현재 데이터에서는 인라인 재생 가능한 영상 ID가 없어 추천 반응 설명만 먼저
+                  보여드립니다.
                 </p>
               </div>
             </div>

@@ -18,6 +18,8 @@
     "deploy:api": "npm run deploy --workspace @awesomekorea/api",
     "deploy:web": "npm run deploy --workspace @awesomekorea/web",
     "build": "npm run build --workspaces --if-present",
+    "smoke:api": "node ./scripts/smoke-deploy.mjs api",
+    "smoke:web": "node ./scripts/smoke-deploy.mjs web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate:local": "npm run db:migrate:local --workspace @awesomekorea/api",
     "db:seed:local": "npm run db:seed:local --workspace @awesomekorea/api"

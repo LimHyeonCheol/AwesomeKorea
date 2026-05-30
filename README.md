@@ -284,6 +284,70 @@ npm run deploy:web
 3. 홈 화면 카드/랭킹 로딩
 4. 콘텐츠 상세 진입 후 인라인 YouTube 플레이어 렌더링
 
+## GitHub Actions 자동배포
+
+현재 저장소는 Cloudflare Git 연동 대신 `GitHub Actions + Wrangler Direct Upload` 기준으로 자동배포하도록 구성했습니다.
+
+### 워크플로 구성
+
+- `.github/workflows/ci.yml`
+  - PR / main 제외 브랜치 push 시 `typecheck + build`
+- `.github/workflows/deploy-production.yml`
+  - `main` push 또는 수동 실행 시
+  - `typecheck -> build -> API 배포 -> API 스모크 테스트 -> Web 배포 -> Web 스모크 테스트`
+- `.github/workflows/reset-remote-db.yml`
+  - GitHub Actions 수동 실행 전용
+  - `RESET` 입력 시 원격 D1 마이그레이션 + 시드 재적용
+  - `seed.sql` 이 기존 데이터를 지우므로 운영 중에는 신중하게 사용
+
+### GitHub Secrets
+
+저장소 `Settings -> Secrets and variables -> Actions -> Secrets` 에 아래 값을 추가합니다.
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_D1_ID`
+- `CLOUDFLARE_KV_ID`
+- `YOUTUBE_API_KEY`
+- 선택: `INTERNAL_API_TOKEN`
+
+`INTERNAL_API_TOKEN` 을 비워두면 배포 워크플로가 실행 중 임시 토큰을 생성해 Worker secret으로 업로드합니다.  
+다만 운영 안정성을 위해서는 고정값 secret 등록을 권장합니다.
+
+### GitHub Variables
+
+저장소 `Settings -> Secrets and variables -> Actions -> Variables` 에 아래 값을 추가하면 좋습니다.
+
+- `CLOUDFLARE_D1_PREVIEW_ID`
+  - 없으면 `CLOUDFLARE_D1_ID` 재사용
+- `CLOUDFLARE_KV_PREVIEW_ID`
+  - 없으면 `CLOUDFLARE_KV_ID` 재사용
+- `AWESOMEKOREA_PAGES_PROJECT`
+  - 기본값: `awesomekorea-web`
+- `AWESOMEKOREA_PAGES_BRANCH`
+  - 기본값: `main`
+- `AWESOMEKOREA_WORKER_URL`
+  - 기본값: `https://awesomekorea-api.awesomekorea-limhyeoncheol.workers.dev`
+
+### 동작 방식
+
+`main` 에 push 되면 아래 순서로 자동 반영됩니다.
+
+1. 의존성 설치
+2. 타입체크/빌드
+3. `npm run deploy:api`
+4. `scripts/smoke-deploy.mjs api` 로 Worker 헬스체크와 내부 엔드포인트 검증
+5. `npm run deploy:web`
+6. `scripts/smoke-deploy.mjs web` 로 Pages 루트/SPA 라우트 검증
+
+### 로컬 스모크 테스트
+
+자동배포와 같은 검증을 로컬에서도 실행할 수 있습니다.
+
+```bash
+SMOKE_API_BASE_URL=https://awesomekorea-api.awesomekorea-limhyeoncheol.workers.dev npm run smoke:api
+SMOKE_WEB_BASE_URL=https://awesomekorea-web.pages.dev SMOKE_EXPECTED_API_BASE_URL=https://awesomekorea-api.awesomekorea-limhyeoncheol.workers.dev npm run smoke:web
+```
+
 ## 프론트 구조 원칙
 
 - 공통 레이아웃은 `apps/web/src/components/common`

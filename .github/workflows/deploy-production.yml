@@ -1,0 +1,130 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - docs/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: awesomekorea-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+
+    steps:
+      - name: Check required secrets
+        id: check
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_D1_ID: ${{ secrets.CLOUDFLARE_D1_ID }}
+          CLOUDFLARE_KV_ID: ${{ secrets.CLOUDFLARE_KV_ID }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_D1_ID" ] && [ -n "$CLOUDFLARE_KV_ID" ] && [ -n "$YOUTUBE_API_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    needs: preflight
+    if: ${{ needs.preflight.outputs.ready == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+      CLOUDFLARE_D1_ID: ${{ secrets.CLOUDFLARE_D1_ID }}
+      CLOUDFLARE_D1_PREVIEW_ID: ${{ vars.CLOUDFLARE_D1_PREVIEW_ID || secrets.CLOUDFLARE_D1_ID }}
+      CLOUDFLARE_KV_ID: ${{ secrets.CLOUDFLARE_KV_ID }}
+      CLOUDFLARE_KV_PREVIEW_ID: ${{ vars.CLOUDFLARE_KV_PREVIEW_ID || secrets.CLOUDFLARE_KV_ID }}
+      AWESOMEKOREA_PAGES_PROJECT: ${{ vars.AWESOMEKOREA_PAGES_PROJECT || 'awesomekorea-web' }}
+      AWESOMEKOREA_PAGES_BRANCH: ${{ vars.AWESOMEKOREA_PAGES_BRANCH || 'main' }}
+      AWESOMEKOREA_WORKER_URL: ${{ vars.AWESOMEKOREA_WORKER_URL || 'https://awesomekorea-api.awesomekorea-limhyeoncheol.workers.dev' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          VITE_API_BASE_URL: ${{ env.AWESOMEKOREA_WORKER_URL }}
+        run: npm run build
+
+      - name: Deploy API Worker
+        run: npm run deploy:api
+
+      - name: Resolve internal API token
+        id: internal-token
+        shell: bash
+        run: |
+          token="${INTERNAL_API_TOKEN}"
+
+          if [ -z "$token" ] && [ -f apps/api/.dev.vars ]; then
+            token="$(grep '^INTERNAL_API_TOKEN=' apps/api/.dev.vars | head -n 1 | cut -d '=' -f 2-)"
+          fi
+
+          if [ -z "$token" ]; then
+            echo "INTERNAL_API_TOKEN could not be resolved." >&2
+            exit 1
+          fi
+
+          echo "::add-mask::$token"
+          echo "value=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test API
+        env:
+          SMOKE_API_BASE_URL: ${{ env.AWESOMEKOREA_WORKER_URL }}
+          SMOKE_INTERNAL_API_TOKEN: ${{ steps.internal-token.outputs.value }}
+        run: npm run smoke:api
+
+      - name: Deploy Web Pages
+        env:
+          VITE_API_BASE_URL: ${{ env.AWESOMEKOREA_WORKER_URL }}
+        run: npm run deploy:web
+
+      - name: Smoke test Web
+        env:
+          SMOKE_WEB_BASE_URL: https://${{ env.AWESOMEKOREA_PAGES_PROJECT }}.pages.dev
+          SMOKE_EXPECTED_API_BASE_URL: ${{ env.AWESOMEKOREA_WORKER_URL }}
+        run: npm run smoke:web
+
+  missing-secrets:
+    needs: preflight
+    if: ${{ needs.preflight.outputs.ready != 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Explain required secrets
+        run: |
+          echo "GitHub Actions deployment was skipped because required secrets are missing."
+          echo "Add these repository secrets before expecting automatic production deploys:"
+          echo "- CLOUDFLARE_API_TOKEN"
+          echo "- CLOUDFLARE_D1_ID"
+          echo "- CLOUDFLARE_KV_ID"
+          echo "- YOUTUBE_API_KEY"

@@ -306,6 +306,8 @@
 .reaction-comments {
   display: flex;
   flex-direction: column;
+  height: min(42rem, calc(100vh - 12rem));
+  max-height: min(42rem, calc(100vh - 12rem));
   min-height: 0;
   padding: 1rem;
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -471,6 +473,11 @@
     grid-template-columns: 1fr;
   }
 
+  .reaction-comments {
+    height: min(34rem, calc(100vh - 10rem));
+    max-height: min(34rem, calc(100vh - 10rem));
+  }
+
   .reaction-comments__scroll {
     max-height: 28rem;
   }
@@ -507,6 +514,15 @@
   .reaction-card__section-chip,
   .reaction-card__section-chip--action {
     width: 100%;
+  }
+
+  .reaction-comments {
+    height: auto;
+    max-height: none;
+  }
+
+  .reaction-comments__scroll {
+    max-height: 24rem;
   }
 
   .reaction-comments__state {

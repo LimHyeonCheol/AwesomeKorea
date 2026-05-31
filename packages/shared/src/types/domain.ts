@@ -44,6 +44,41 @@ export interface ReactionVideo {
   channelName: string;
 }
 
+export interface ReactionCommentReply {
+  id: string;
+  authorDisplayName: string;
+  authorProfileImageUrl: string | null;
+  text: string;
+  likeCount: number;
+  publishedAt: string;
+}
+
+export interface ReactionComment {
+  id: string;
+  authorDisplayName: string;
+  authorProfileImageUrl: string | null;
+  text: string;
+  likeCount: number;
+  publishedAt: string;
+  updatedAt: string;
+  replyCount: number;
+  replies: ReactionCommentReply[];
+}
+
+export interface ReactionCommentsPayload {
+  videoId: string;
+  status: "ok" | "empty" | "disabled" | "unavailable";
+  items: ReactionComment[];
+  order: "relevance" | "time";
+  strategy: "top50" | "full";
+  fetchedAll: boolean;
+  pageSize: number;
+  fetchedCount: number;
+  totalCommentCount: number;
+  estimatedQuotaUnits: number;
+  message: string;
+}
+
 export interface HomeRankingItem {
   rank: number;
   contentSlug: string;

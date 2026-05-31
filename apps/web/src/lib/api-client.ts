@@ -5,6 +5,7 @@ import type {
   ContentSummary,
   HomePayload,
   PaginatedResponse,
+  ReactionCommentsPayload,
   ReactionListPayload,
   SortOrder,
 } from "@awesomekorea/shared";
@@ -85,6 +86,10 @@ export const apiClient = {
       })}`,
     ),
   getHome: () => request<HomePayload>("/api/home"),
+  getReactionComments: (youtubeVideoId: string) =>
+    request<ReactionCommentsPayload>(
+      `/api/reactions/${encodeURIComponent(youtubeVideoId)}/comments`,
+    ),
   getReactions: (slug: string, sort: SortOrder, page = 1, limit = 12) =>
     request<ReactionListPayload>(
       `/api/contents/${encodeURIComponent(slug)}/reactions?${buildQuery({

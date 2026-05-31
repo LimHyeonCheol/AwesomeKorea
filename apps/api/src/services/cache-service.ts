@@ -29,16 +29,24 @@ export const withCache = async <T>(
     if (cached) {
       return cached as T;
     }
+  } catch {
+    return await factory();
+  }
 
-    const payload = await factory();
+  const payload = await factory();
+
+  try {
+    const version = await readCacheVersion(cache);
+    const scopedKey = buildScopedKey(version, key);
+
     await cache.put(scopedKey, JSON.stringify(payload), {
       expirationTtl: ttlSeconds,
     });
-
-    return payload;
   } catch {
-    return factory();
+    return payload;
   }
+
+  return payload;
 };
 
 export const bumpCacheVersion = async (cache: KVNamespace) => {

@@ -1,6 +1,7 @@
 import type {
   Category,
   ContentDetailPayload,
+  ReactionCommentsPayload,
   ContentSummary,
   HomePayload,
   PaginatedResponse,
@@ -220,6 +221,76 @@ const previewReactions: Record<string, ReactionVideo[]> = {
   ],
 };
 
+const previewComments: Record<string, ReactionCommentsPayload> = {
+  "react-001": {
+    videoId: "react-001",
+    status: "ok",
+    order: "relevance",
+    strategy: "top50",
+    fetchedAll: false,
+    pageSize: 50,
+    fetchedCount: 3,
+    totalCommentCount: 1400,
+    estimatedQuotaUnits: 1,
+    message:
+      "댓글 1개마다 quota가 차감되는 구조는 아니지만, 페이지 요청마다 quota 1이 소모돼 인기 댓글 50개만 먼저 보여드려요.",
+    items: [
+      {
+        id: "preview-comment-1",
+        authorDisplayName: "MovieLover88",
+        authorProfileImageUrl: null,
+        text:
+          "이 영화는 액션 템포도 좋지만 코미디 타이밍이 정말 좋네요. 해외 반응이 많은 이유를 알겠어요.",
+        likeCount: 328,
+        publishedAt: "2026-05-30T02:12:00.000Z",
+        updatedAt: "2026-05-30T02:12:00.000Z",
+        replyCount: 2,
+        replies: [
+          {
+            id: "preview-comment-1-reply-1",
+            authorDisplayName: "KoreanCinemaClub",
+            authorProfileImageUrl: null,
+            text: "특히 후반부 전개가 외국 시청자에게도 잘 먹히는 것 같아요.",
+            likeCount: 41,
+            publishedAt: "2026-05-30T03:05:00.000Z",
+          },
+        ],
+      },
+      {
+        id: "preview-comment-2",
+        authorDisplayName: "FirstTimeWatcher",
+        authorProfileImageUrl: null,
+        text: "처음 봤는데 생각보다 더 세련된 연출이라 놀랐습니다.",
+        likeCount: 174,
+        publishedAt: "2026-05-30T04:20:00.000Z",
+        updatedAt: "2026-05-30T04:20:00.000Z",
+        replyCount: 0,
+        replies: [],
+      },
+      {
+        id: "preview-comment-3",
+        authorDisplayName: "LaughTrackDaily",
+        authorProfileImageUrl: null,
+        text: "채널 주인장 리액션도 좋지만 관객 반응 같이 보는 재미가 있네요.",
+        likeCount: 102,
+        publishedAt: "2026-05-30T06:10:00.000Z",
+        updatedAt: "2026-05-30T06:10:00.000Z",
+        replyCount: 1,
+        replies: [
+          {
+            id: "preview-comment-3-reply-1",
+            authorDisplayName: "GlobalViewer",
+            authorProfileImageUrl: null,
+            text: "그래서 이 앱에서 댓글 같이 보는 구성이 잘 어울려요.",
+            likeCount: 18,
+            publishedAt: "2026-05-30T06:44:00.000Z",
+          },
+        ],
+      },
+    ],
+  },
+};
+
 for (const content of previewContents) {
   if (!previewReactions[content.slug]) {
     previewReactions[content.slug] = [
@@ -400,6 +471,30 @@ export const getDevPreviewPayload = (requestPath: string) => {
     };
 
     return payload;
+  }
+
+  const commentMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments$/);
+
+  if (commentMatch) {
+    const rawVideoId = commentMatch[1];
+
+    if (!rawVideoId) {
+      return null;
+    }
+
+    return previewComments[decodeURIComponent(rawVideoId)] ?? {
+      videoId: decodeURIComponent(rawVideoId),
+      status: "empty",
+      order: "relevance",
+      strategy: "full",
+      fetchedAll: true,
+      pageSize: 50,
+      fetchedCount: 0,
+      totalCommentCount: 0,
+      estimatedQuotaUnits: 0,
+      message: "아직 표시할 댓글이 없어요.",
+      items: [],
+    };
   }
 
   return null;

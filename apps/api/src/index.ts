@@ -9,11 +9,17 @@ import {
   getFeaturedReactionByContentSlug,
   getContentList,
   getHomePayload,
+  getReactionByYoutubeVideoId,
   getReactionsByContentSlug,
 } from "./repositories/catalog-repository";
 import { bumpCacheVersion, withCache } from "./services/cache-service";
 import { ensureBootstrapContentData } from "./services/bootstrap-service";
 import { rebuildRankings } from "./services/ranking-service";
+import {
+  createUnavailableCommentsPayload,
+  getYoutubeReactionComments,
+  YoutubeCommentsUnavailableError,
+} from "./services/youtube-comments-service";
 import { syncYoutubeReactions } from "./services/youtube-sync-service";
 import type { AppBindings } from "./types";
 
@@ -44,6 +50,8 @@ const HOME_CACHE_TTL_SECONDS = 60 * 10;
 const CONTENT_LIST_CACHE_TTL_SECONDS = 60 * 10;
 const CONTENT_DETAIL_CACHE_TTL_SECONDS = 60 * 5;
 const REACTION_LIST_CACHE_TTL_SECONDS = 60 * 5;
+const REACTION_COMMENTS_CACHE_TTL_SECONDS = 60 * 30;
+const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 
 const assertInternalToken = (c: {
   env: AppBindings["Bindings"];
@@ -222,6 +230,60 @@ app.get("/api/contents/:slug/reactions", async (c) => {
   );
 
   return c.json(payload);
+});
+
+app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
+  await ensureBootstrapContentData(c.env);
+  const youtubeVideoId = c.req.param("youtubeVideoId");
+
+  if (!YOUTUBE_VIDEO_ID_PATTERN.test(youtubeVideoId)) {
+    throw new HTTPException(400, {
+      message: "유효한 유튜브 영상 ID가 아니에요.",
+    });
+  }
+
+  const reaction = await getReactionByYoutubeVideoId(c.env.DB, youtubeVideoId);
+
+  if (!reaction) {
+    throw new HTTPException(404, {
+      message: "댓글을 불러올 반응 영상을 찾을 수 없어요.",
+    });
+  }
+
+  if (!c.env.YOUTUBE_API_KEY) {
+    return c.json(
+      createUnavailableCommentsPayload(
+        youtubeVideoId,
+        reaction.commentCount,
+        "댓글 API 키가 설정되지 않아 지금은 댓글을 불러올 수 없어요.",
+      ),
+    );
+  }
+
+  try {
+    const payload = await withCache(
+      c.env.CONTENT_CACHE,
+      `reaction-comments:${youtubeVideoId}:${reaction.commentCount}`,
+      REACTION_COMMENTS_CACHE_TTL_SECONDS,
+      () =>
+        getYoutubeReactionComments({
+          apiKey: c.env.YOUTUBE_API_KEY as string,
+          totalCommentCount: reaction.commentCount,
+          videoId: youtubeVideoId,
+        }),
+    );
+
+    return c.json(payload);
+  } catch (error) {
+    if (error instanceof YoutubeCommentsUnavailableError) {
+      return c.json(
+        createUnavailableCommentsPayload(youtubeVideoId, reaction.commentCount, error.message),
+        200,
+      );
+    }
+
+    throw error;
+  }
 });
 
 app.post("/internal/sync/youtube", async (c) => {

@@ -582,6 +582,39 @@ export const getReactionsByContentSlug = async (
   );
 };
 
+export const getReactionByYoutubeVideoId = async (
+  db: D1Database,
+  youtubeVideoId: string,
+): Promise<ReactionVideo | null> => {
+  const row = await db
+    .prepare(
+      `
+        SELECT
+          rv.id AS id,
+          rv.youtube_video_id AS youtubeVideoId,
+          rv.title AS title,
+          rv.thumbnail_url AS thumbnailUrl,
+          rv.published_at AS publishedAt,
+          rv.view_count AS viewCount,
+          rv.like_count AS likeCount,
+          rv.comment_count AS commentCount,
+          rv.youtube_url AS youtubeUrl,
+          ch.title AS channelName
+        FROM reaction_videos rv
+        JOIN channels ch
+          ON ch.id = rv.channel_id
+        WHERE rv.youtube_video_id = ?
+          AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+        LIMIT 1
+      `,
+    )
+    .bind(youtubeVideoId)
+    .first<ReactionVideoRow>();
+
+  return row ? mapReactionVideo(row) : null;
+};
+
 export const getActiveContentsForSync = async (db: D1Database): Promise<SyncContent[]> => {
   const result = await db
     .prepare(

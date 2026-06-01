@@ -25,9 +25,9 @@ export const MVP_CATEGORIES = [
   },
 ] as const;
 
-export type CategorySlug = (typeof MVP_CATEGORIES)[number]["slug"];
+export type CategorySlug = string;
 
-export const CATEGORY_NAME_BY_SLUG: Record<CategorySlug, string> = {
+export const CATEGORY_NAME_BY_SLUG: Record<string, string> = {
   movie: "영화",
   drama: "드라마",
   webtoon: "만화",

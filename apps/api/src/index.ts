@@ -1,8 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
+import type { ContentStatus, HomeSiteCopy } from "@awesomekorea/shared";
 
 import { clampLimit, clampPage, parseSort } from "./lib/pagination";
+import {
+  createAdminCategory,
+  createAdminContent,
+  getAdminDashboard,
+  saveAdminHomeSettings,
+  updateAdminCategory,
+  updateAdminContent,
+  updateAdminReaction,
+} from "./repositories/admin-repository";
 import {
   getCategories,
   getContentBySlug,
@@ -95,6 +105,155 @@ const buildContentListCacheKey = (
   page: number,
   limit: number,
 ) => `contents:${category ?? "all"}:${sort}:${page}:${limit}`;
+
+const readJsonBody = async (c: {
+  req: {
+    json: () => Promise<unknown>;
+  };
+}) => {
+  try {
+    return (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    throw new HTTPException(400, {
+      message: "요청 본문이 올바른 JSON 형식이 아니에요.",
+    });
+  }
+};
+
+const requireStringField = (value: unknown, fieldLabel: string) => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new HTTPException(400, {
+      message: `${fieldLabel} 값을 입력해 주세요.`,
+    });
+  }
+
+  return value.trim();
+};
+
+const optionalStringField = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const parseBooleanField = (value: unknown, fallback = false) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (value === 1 || value === "1" || value === "true") {
+    return true;
+  }
+
+  if (value === 0 || value === "0" || value === "false") {
+    return false;
+  }
+
+  return fallback;
+};
+
+const parseIntegerField = (
+  value: unknown,
+  fieldLabel: string,
+  options: {
+    allowNull?: boolean;
+    fallback?: number;
+    min?: number;
+  } = {},
+) => {
+  if ((value === null || value === undefined || value === "") && options.allowNull) {
+    return null;
+  }
+
+  const parsed = Number(value ?? options.fallback ?? 0);
+
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    throw new HTTPException(400, {
+      message: `${fieldLabel} 값은 정수여야 합니다.`,
+    });
+  }
+
+  if (options.min !== undefined && parsed < options.min) {
+    throw new HTTPException(400, {
+      message: `${fieldLabel} 값은 ${options.min} 이상이어야 합니다.`,
+    });
+  }
+
+  return parsed;
+};
+
+const parseAliasesField = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string");
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+
+  return [];
+};
+
+const parseContentStatusField = (value: unknown): ContentStatus => {
+  if (value === "active" || value === "hidden") {
+    return value;
+  }
+
+  throw new HTTPException(400, {
+    message: "콘텐츠 상태는 active 또는 hidden 이어야 합니다.",
+  });
+};
+
+const parseHomeSettingsPayload = (payload: Record<string, unknown>): HomeSiteCopy => ({
+  brandName: requireStringField(payload.brandName, "브랜드명"),
+  brandTagline: requireStringField(payload.brandTagline, "브랜드 태그라인"),
+  heroBadge: requireStringField(payload.heroBadge, "히어로 배지"),
+  heroToolbarCopy: requireStringField(payload.heroToolbarCopy, "히어로 상단 문구"),
+  heroTitle: requireStringField(payload.heroTitle, "대문 제목"),
+  heroDescription: requireStringField(payload.heroDescription, "대문 설명"),
+});
+
+const parseCategoryPayload = (payload: Record<string, unknown>) => ({
+  slug: requireStringField(payload.slug, "카테고리 slug"),
+  nameKo: requireStringField(payload.nameKo, "카테고리명"),
+  sortOrder: parseIntegerField(payload.sortOrder, "카테고리 정렬 순서", {
+    fallback: 0,
+    min: 0,
+  }) as number,
+  isActive: parseBooleanField(payload.isActive, true),
+});
+
+const parseContentPayload = (payload: Record<string, unknown>) => ({
+  categoryId: parseIntegerField(payload.categoryId, "카테고리", {
+    min: 1,
+  }) as number,
+  slug: requireStringField(payload.slug, "콘텐츠 slug"),
+  titleKo: requireStringField(payload.titleKo, "콘텐츠 제목(한글)"),
+  titleEn: optionalStringField(payload.titleEn),
+  aliases: parseAliasesField(payload.aliases),
+  releaseYear: parseIntegerField(payload.releaseYear, "출시 연도", {
+    allowNull: true,
+  }) as number | null,
+  thumbnailUrl: optionalStringField(payload.thumbnailUrl),
+  description: optionalStringField(payload.description),
+  status: parseContentStatusField(payload.status),
+});
+
+const parseReactionPayload = (payload: Record<string, unknown>) => ({
+  adminTitle: optionalStringField(payload.adminTitle),
+  adminDescription: optionalStringField(payload.adminDescription),
+  isFeatured: parseBooleanField(payload.isFeatured, false),
+  featuredOrder: parseIntegerField(payload.featuredOrder, "메인 노출 순서", {
+    fallback: 0,
+    min: 0,
+  }) as number,
+});
 
 app.get("/", (c) =>
   c.json({
@@ -286,6 +445,108 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
   }
 });
 
+app.get("/api/admin/dashboard", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+  await ensureBootstrapContentData(c.env);
+
+  const payload = await getAdminDashboard(c.env.DB);
+  return c.json(payload);
+});
+
+app.put("/api/admin/settings/home", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const payload = parseHomeSettingsPayload(await readJsonBody(c));
+  await saveAdminHomeSettings(c.env.DB, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+    settings: payload,
+  });
+});
+
+app.post("/api/admin/categories", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const payload = parseCategoryPayload(await readJsonBody(c));
+  await createAdminCategory(c.env.DB, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+  });
+});
+
+app.put("/api/admin/categories/:id", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const categoryId = parseIntegerField(c.req.param("id"), "카테고리 ID", {
+    min: 1,
+  }) as number;
+  const payload = parseCategoryPayload(await readJsonBody(c));
+  await updateAdminCategory(c.env.DB, categoryId, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+  });
+});
+
+app.post("/api/admin/contents", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const payload = parseContentPayload(await readJsonBody(c));
+  await createAdminContent(c.env.DB, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+  });
+});
+
+app.put("/api/admin/contents/:id", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
+    min: 1,
+  }) as number;
+  const payload = parseContentPayload(await readJsonBody(c));
+  await updateAdminContent(c.env.DB, contentId, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+  });
+});
+
+app.put("/api/admin/reactions/:youtubeVideoId", async (c) => {
+  assertInternalToken(c);
+  c.header("Cache-Control", "no-store");
+
+  const youtubeVideoId = c.req.param("youtubeVideoId");
+
+  if (!youtubeVideoId) {
+    throw new HTTPException(400, {
+      message: "유튜브 영상 ID가 필요합니다.",
+    });
+  }
+
+  const payload = parseReactionPayload(await readJsonBody(c));
+  await updateAdminReaction(c.env.DB, youtubeVideoId, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+  });
+});
+
 app.post("/internal/sync/youtube", async (c) => {
   assertInternalToken(c);
   c.header("Cache-Control", "no-store");
@@ -333,6 +594,18 @@ app.onError((error, c) => {
   }
 
   console.error(error);
+
+  const normalizedMessage = error instanceof Error ? error.message : String(error);
+
+  if (normalizedMessage.includes("UNIQUE constraint failed")) {
+    return c.json(
+      {
+        message: "이미 같은 식별자를 가진 데이터가 있어 저장하지 못했습니다.",
+      },
+      409,
+      headers,
+    );
+  }
 
   return c.json(
     {

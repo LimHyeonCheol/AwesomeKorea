@@ -19,6 +19,7 @@ import {
   toNumber,
   toStringValue,
 } from "../lib/serializers";
+import { getFeaturedHomeReactions, getHomeSiteCopy } from "./site-settings-repository";
 
 interface CategoryRow {
   id: number;
@@ -62,6 +63,7 @@ interface ReactionVideoRow {
   channelId?: string | null;
   channelName: string;
   commentCount: number;
+  description: string | null;
   id: number;
   likeCount: number;
   publishedAt: string;
@@ -133,7 +135,7 @@ const mapContentSummary = (row: ContentSummaryRow): ContentSummary => ({
   titleEn: toNullableString(row.titleEn),
   categorySlug: row.categorySlug,
   categoryNameKo:
-    toNullableString(row.categoryNameKo) ?? CATEGORY_NAME_BY_SLUG[row.categorySlug],
+    toNullableString(row.categoryNameKo) ?? CATEGORY_NAME_BY_SLUG[row.categorySlug] ?? row.categorySlug,
   releaseYear: row.releaseYear === null ? null : toNumber(row.releaseYear),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   description: toNullableString(row.description),
@@ -148,7 +150,7 @@ const mapRankingItem = (row: RankingRow): HomeRankingItem => ({
   titleKo: toStringValue(row.titleKo),
   categorySlug: row.categorySlug,
   categoryNameKo:
-    toNullableString(row.categoryNameKo) ?? CATEGORY_NAME_BY_SLUG[row.categorySlug],
+    toNullableString(row.categoryNameKo) ?? CATEGORY_NAME_BY_SLUG[row.categorySlug] ?? row.categorySlug,
   reactionCount: toNumber(row.reactionCount),
   totalViews: toNumber(row.totalViews),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
@@ -158,6 +160,7 @@ const mapReactionVideo = (row: ReactionVideoRow): ReactionVideo => ({
   id: toNumber(row.id),
   youtubeVideoId: toStringValue(row.youtubeVideoId),
   title: toStringValue(row.title),
+  description: toNullableString(row.description),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   publishedAt: toStringValue(row.publishedAt),
   viewCount: toNumber(row.viewCount),
@@ -189,139 +192,148 @@ export const getCategories = async (db: D1Database): Promise<Category[]> => {
 };
 
 export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
-  const topResult = await db
-    .prepare(
-      `
-        WITH latest_window AS (
-          SELECT COALESCE(date(MAX(rv.published_at)), date('now')) AS snapshotDate
-          FROM reaction_videos rv
-          WHERE rv.is_overseas_reaction = 1
-            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
-        ),
-        aggregated AS (
+  const [siteCopy, featuredReactions, categories, topResult, popularResult] = await Promise.all([
+    getHomeSiteCopy(db),
+    getFeaturedHomeReactions(db),
+    getCategories(db),
+    db
+      .prepare(
+        `
+          WITH latest_window AS (
+            SELECT COALESCE(date(MAX(rv.published_at)), date('now')) AS snapshotDate
+            FROM reaction_videos rv
+            WHERE rv.is_overseas_reaction = 1
+              AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+          ),
+          aggregated AS (
+            SELECT
+              c.id AS contentId,
+              cat.id AS categoryId,
+              c.slug AS contentSlug,
+              c.title_ko AS titleKo,
+              cat.slug AS categorySlug,
+              cat.name_ko AS categoryNameKo,
+              COUNT(rv.id) AS reactionCount,
+              COALESCE(SUM(rv.view_count), 0) AS totalViews,
+              c.thumbnail_url AS thumbnailUrl
+            FROM contents c
+            JOIN categories cat
+              ON cat.id = c.category_id
+            JOIN reaction_videos rv
+              ON rv.content_id = c.id
+            CROSS JOIN latest_window lw
+            WHERE c.status = 'active'
+              AND rv.is_overseas_reaction = 1
+              AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+              AND date(rv.published_at) BETWEEN date(lw.snapshotDate, '-6 day') AND date(lw.snapshotDate)
+            GROUP BY
+              c.id,
+              cat.id,
+              c.slug,
+              c.title_ko,
+              cat.slug,
+              cat.name_ko,
+              c.thumbnail_url
+          ),
+          ranked AS (
+            SELECT
+              contentId,
+              categoryId,
+              contentSlug,
+              titleKo,
+              categorySlug,
+              categoryNameKo,
+              reactionCount,
+              totalViews,
+              thumbnailUrl,
+              ROW_NUMBER() OVER (
+                ORDER BY reactionCount DESC, totalViews DESC, contentId ASC
+              ) AS rank
+            FROM aggregated
+          )
           SELECT
-            c.id AS contentId,
-            cat.id AS categoryId,
-            c.slug AS contentSlug,
-            c.title_ko AS titleKo,
-            cat.slug AS categorySlug,
-            cat.name_ko AS categoryNameKo,
-            COUNT(rv.id) AS reactionCount,
-            COALESCE(SUM(rv.view_count), 0) AS totalViews,
-            c.thumbnail_url AS thumbnailUrl
-          FROM contents c
-          JOIN categories cat
-            ON cat.id = c.category_id
-          JOIN reaction_videos rv
-            ON rv.content_id = c.id
-          CROSS JOIN latest_window lw
-          WHERE c.status = 'active'
-            AND rv.is_overseas_reaction = 1
-            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
-            AND date(rv.published_at) BETWEEN date(lw.snapshotDate, '-6 day') AND date(lw.snapshotDate)
-          GROUP BY
-            c.id,
-            cat.id,
-            c.slug,
-            c.title_ko,
-            cat.slug,
-            cat.name_ko,
-            c.thumbnail_url
-        ),
-        ranked AS (
-          SELECT
-            contentId,
-            categoryId,
+            rank,
             contentSlug,
             titleKo,
             categorySlug,
             categoryNameKo,
             reactionCount,
             totalViews,
-            thumbnailUrl,
-            ROW_NUMBER() OVER (
-              ORDER BY reactionCount DESC, totalViews DESC, contentId ASC
-            ) AS rank
-          FROM aggregated
-        )
-        SELECT
-          rank,
-          contentSlug,
-          titleKo,
-          categorySlug,
-          categoryNameKo,
-          reactionCount,
-          totalViews,
-          thumbnailUrl
-        FROM ranked
-        ORDER BY rank ASC
-        LIMIT 10
-      `,
-    )
-    .all<RankingRow>();
-
-  const popularResult = await db
-    .prepare(
-      `
-        SELECT
-          c.id AS id,
-          c.slug AS slug,
-          c.title_ko AS titleKo,
-          c.title_en AS titleEn,
-          cat.slug AS categorySlug,
-          cat.name_ko AS categoryNameKo,
-          c.release_year AS releaseYear,
-          c.thumbnail_url AS thumbnailUrl,
-          c.description AS description,
-          COUNT(rv.id) AS reactionCount,
-          COALESCE(SUM(rv.view_count), 0) AS totalViews,
-          MAX(rv.published_at) AS latestReactionAt
-        FROM contents c
-        JOIN categories cat
-          ON cat.id = c.category_id
-        LEFT JOIN reaction_videos rv
-          ON rv.content_id = c.id
-          AND rv.is_overseas_reaction = 1
-          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
-        WHERE c.status = 'active'
-        GROUP BY
-          c.id,
-          c.slug,
-          c.title_ko,
-          c.title_en,
-          cat.slug,
-          cat.name_ko,
-          c.release_year,
-          c.thumbnail_url,
-          c.description
-        ORDER BY totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC
-      `,
-    )
-    .all<ContentSummaryRow>();
+            thumbnailUrl
+          FROM ranked
+          ORDER BY rank ASC
+          LIMIT 10
+        `,
+      )
+      .all<RankingRow>(),
+    db
+      .prepare(
+        `
+          SELECT
+            c.id AS id,
+            c.slug AS slug,
+            c.title_ko AS titleKo,
+            c.title_en AS titleEn,
+            cat.slug AS categorySlug,
+            cat.name_ko AS categoryNameKo,
+            c.release_year AS releaseYear,
+            c.thumbnail_url AS thumbnailUrl,
+            c.description AS description,
+            COUNT(rv.id) AS reactionCount,
+            COALESCE(SUM(rv.view_count), 0) AS totalViews,
+            MAX(rv.published_at) AS latestReactionAt
+          FROM contents c
+          JOIN categories cat
+            ON cat.id = c.category_id
+          LEFT JOIN reaction_videos rv
+            ON rv.content_id = c.id
+            AND rv.is_overseas_reaction = 1
+            AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+          WHERE c.status = 'active'
+            AND cat.is_active = 1
+          GROUP BY
+            c.id,
+            c.slug,
+            c.title_ko,
+            c.title_en,
+            cat.slug,
+            cat.name_ko,
+            c.release_year,
+            c.thumbnail_url,
+            c.description
+          ORDER BY totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC
+        `,
+      )
+      .all<ContentSummaryRow>(),
+  ]);
 
   const top10 = (topResult.results ?? []).map(mapRankingItem);
   const popularItems = (popularResult.results ?? []).map(mapContentSummary);
   const sections: HomePayload["popularByCategory"] = [
     {
-      categorySlug: "all" as const,
+      categorySlug: "all",
       categoryNameKo: "전체",
       items: popularItems.slice(0, 8),
     },
   ];
 
-  for (const [slug, nameKo] of Object.entries(CATEGORY_NAME_BY_SLUG) as [
-    CategorySlug,
-    string,
-  ][]) {
+  for (const category of categories) {
     sections.push({
-      categorySlug: slug,
-      categoryNameKo: nameKo,
-      items: popularItems.filter((item) => item.categorySlug === slug).slice(0, 4),
+      categorySlug: category.slug,
+      categoryNameKo: category.nameKo,
+      items: popularItems.filter((item) => item.categorySlug === category.slug).slice(0, 4),
     });
   }
 
-  return {
-    hero: top10[0]
+  const hero = featuredReactions[0]
+    ? {
+        contentSlug: featuredReactions[0].contentSlug,
+        titleKo: featuredReactions[0].contentTitle,
+        categoryNameKo: featuredReactions[0].categoryNameKo,
+        reactionCount: featuredReactions[0].reactionCount,
+        message: "관리자가 고른 대표 반응",
+      }
+    : top10[0]
       ? {
           contentSlug: top10[0].contentSlug,
           titleKo: top10[0].titleKo,
@@ -329,7 +341,12 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
           reactionCount: top10[0].reactionCount,
           message: "오늘 가장 많이 본 반응 콘텐츠",
         }
-      : null,
+      : null;
+
+  return {
+    siteCopy,
+    hero,
+    featuredReactions,
     top10,
     popularByCategory: sections,
     updatedAt: new Date().toISOString(),
@@ -490,7 +507,8 @@ export const getFeaturedReactionByContentSlug = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          rv.title AS title,
+          COALESCE(rv.admin_title, rv.title) AS title,
+          rv.admin_description AS description,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,
@@ -506,7 +524,7 @@ export const getFeaturedReactionByContentSlug = async (
         WHERE c.slug = ?
           AND rv.is_overseas_reaction = 1
           AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
-        ORDER BY rv.view_count DESC, rv.published_at DESC
+        ORDER BY rv.is_featured_home DESC, rv.featured_home_order ASC, rv.view_count DESC, rv.published_at DESC
         LIMIT 1
       `,
     )
@@ -536,7 +554,8 @@ export const getReactionsByContentSlug = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          rv.title AS title,
+          COALESCE(rv.admin_title, rv.title) AS title,
+          rv.admin_description AS description,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,
@@ -592,7 +611,8 @@ export const getReactionByYoutubeVideoId = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          rv.title AS title,
+          COALESCE(rv.admin_title, rv.title) AS title,
+          rv.admin_description AS description,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,

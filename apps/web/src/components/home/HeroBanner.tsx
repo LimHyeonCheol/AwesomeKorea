@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState } from "react";
 
-import type { HeroHighlight, ReactionVideo } from "@awesomekorea/shared";
+import type { HeroHighlight, HomeSiteCopy, ReactionVideo } from "@awesomekorea/shared";
 
 import { formatCompactNumber } from "../../lib/formatters";
 
@@ -25,6 +25,7 @@ interface HeroBannerProps {
   isLoading: boolean;
   onLatestClick: () => void;
   onOpenContent: (slug: string) => void;
+  siteCopy: HomeSiteCopy;
   slides: HeroBannerSlide[];
 }
 
@@ -54,6 +55,7 @@ export function HeroBanner({
   isLoading,
   onLatestClick,
   onOpenContent,
+  siteCopy,
   slides,
 }: HeroBannerProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -99,14 +101,9 @@ export function HeroBanner({
       <section className="hero-banner">
         <div className="hero-banner__fallback">
           <div className="hero-banner__copy">
-            <span className="hero-banner__live-badge">추천 리액션</span>
-            <h1 className="hero-banner__title">
-              관심 있는 한국 콘텐츠의 대표 반응을 메인에서 바로 훑어볼 수 있게 준비하고 있습니다.
-            </h1>
-            <p className="hero-banner__description">
-              상단 대표 섹션에서는 자동으로 넘어가는 추천 리액션과 함께, 바로 상세 페이지로
-              이어지는 탐색 흐름을 제공합니다.
-            </p>
+            <span className="hero-banner__live-badge">{siteCopy.heroBadge}</span>
+            <h1 className="hero-banner__title">{siteCopy.heroTitle}</h1>
+            <p className="hero-banner__description">{siteCopy.heroDescription}</p>
             <div className="hero-banner__actions">
               <button
                 className="chip-button chip-button--solid"
@@ -149,10 +146,8 @@ export function HeroBanner({
     <section className="hero-banner">
       <div className="hero-banner__toolbar">
         <div>
-          <span className="hero-banner__live-badge">추천 리액션</span>
-          <p className="hero-banner__toolbar-copy">
-            대표 반응 영상을 자동으로 넘겨보며 지금 많이 보는 리액션을 빠르게 훑어보세요.
-          </p>
+          <span className="hero-banner__live-badge">{siteCopy.heroBadge}</span>
+          <p className="hero-banner__toolbar-copy">{siteCopy.heroToolbarCopy}</p>
         </div>
 
         {slides.length > 1 ? (

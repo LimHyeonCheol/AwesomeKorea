@@ -110,6 +110,9 @@ export function ReactionListItem({ isExpanded, onToggle, reaction }: ReactionLis
                 <div>
                   <p className="reaction-card__summary-title">{reaction.title}</p>
                   <p className="reaction-card__summary-channel">{reaction.channelName}</p>
+                  {reaction.description ? (
+                    <p className="reaction-card__summary-description">{reaction.description}</p>
+                  ) : null}
                 </div>
                 <div className="reaction-card__summary-meta">
                   <span>조회수 {formatCompactNumber(reaction.viewCount)}</span>

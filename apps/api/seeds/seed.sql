@@ -1,3 +1,4 @@
+DELETE FROM app_settings;
 DELETE FROM ranking_snapshots;
 DELETE FROM reaction_videos;
 DELETE FROM channels;
@@ -104,3 +105,35 @@ INSERT INTO ranking_snapshots (
   (12, 3, 4, 'popular', 2, 91, 5400000, '2026-05-30'),
   (13, 5, 1, 'popular', 3, 62, 3200000, '2026-05-30'),
   (14, 8, 2, 'popular', 4, 38, 2900000, '2026-05-30');
+
+INSERT INTO app_settings (setting_key, value_text, updated_at) VALUES
+  ('site.brandName', '어썸코리아', '2026-05-30T00:00:00.000Z'),
+  ('site.brandTagline', 'Awesome Korea - 해외 반응 모음', '2026-05-30T00:00:00.000Z'),
+  ('home.heroBadge', '관리자 추천', '2026-05-30T00:00:00.000Z'),
+  ('home.heroToolbarCopy', '운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 살펴보세요.', '2026-05-30T00:00:00.000Z'),
+  ('home.heroTitle', '지금 소개할 대표 반응을 운영자가 직접 편성합니다.', '2026-05-30T00:00:00.000Z'),
+  ('home.heroDescription', '대문 문구, 카테고리, 유튜브 제목과 소개글, 메인 대표 반응까지 모두 관리자에서 조정할 수 있습니다.', '2026-05-30T00:00:00.000Z');
+
+UPDATE reaction_videos
+SET
+  admin_title = '미국 채널이 본 극한직업 첫 반응',
+  admin_description = '메인에서 먼저 보여줄 대표 리액션입니다. 코미디 포인트에 대한 해외 반응을 빠르게 확인할 수 있습니다.',
+  is_featured_home = 1,
+  featured_home_order = 1
+WHERE youtube_video_id = 'react-001';
+
+UPDATE reaction_videos
+SET
+  admin_title = '오징어게임 시즌2 해외 트레일러 반응',
+  admin_description = '반응 속도와 조회수가 함께 높은 대표 트레일러 리액션입니다.',
+  is_featured_home = 1,
+  featured_home_order = 2
+WHERE youtube_video_id = 'react-008';
+
+UPDATE reaction_videos
+SET
+  admin_title = 'APT. 뮤직비디오 보컬 분석 리액션',
+  admin_description = '음악 카테고리에서 메인에 올릴 수 있는 대표 반응 예시입니다.',
+  is_featured_home = 1,
+  featured_home_order = 3
+WHERE youtube_video_id = 'react-005';

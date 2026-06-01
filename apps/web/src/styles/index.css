@@ -2,5 +2,6 @@
 @import "./base.css";
 @import "./layout.css";
 @import "./components/common.css";
+@import "./components/admin.css";
 @import "./components/home.css";
 @import "./components/detail.css";

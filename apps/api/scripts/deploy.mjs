@@ -26,6 +26,38 @@ console.log(
 console.log(
   `[deploy:api] Cloudflare 프로덕션 설정 파일 생성 완료. (${path.relative(appDir, configPath)})`,
 );
+console.log("[deploy:api] D1 마이그레이션을 원격 데이터베이스에 적용합니다.");
+
+const migrationResult = spawnSync(
+  process.execPath,
+  [
+    wranglerPath,
+    "d1",
+    "migrations",
+    "apply",
+    "awesome-korea",
+    "--remote",
+    "--config",
+    configPath,
+  ],
+  {
+    cwd: appDir,
+    encoding: "utf8",
+  },
+);
+
+if (migrationResult.stdout) {
+  process.stdout.write(migrationResult.stdout);
+}
+
+if (migrationResult.stderr) {
+  process.stderr.write(migrationResult.stderr);
+}
+
+if ((migrationResult.status ?? 0) !== 0) {
+  process.exit(migrationResult.status ?? 1);
+}
+
 console.log("[deploy:api] awesomekorea-api 배포를 시작합니다.");
 
 const result = spawnSync(

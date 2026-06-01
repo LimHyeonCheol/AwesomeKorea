@@ -2,6 +2,7 @@ import type { CategorySlug } from "../constants/categories";
 
 export type SortOrder = "popular" | "latest";
 export type CategoryFilter = CategorySlug | "all";
+export type ContentStatus = "active" | "hidden";
 
 export interface Category {
   id: number;
@@ -34,6 +35,7 @@ export interface ReactionVideo {
   id: number;
   youtubeVideoId: string;
   title: string;
+  description: string | null;
   thumbnailUrl: string | null;
   publishedAt: string;
   viewCount: number;
@@ -104,8 +106,30 @@ export interface HomeSection {
   items: ContentSummary[];
 }
 
+export interface HomeSiteCopy {
+  brandName: string;
+  brandTagline: string;
+  heroBadge: string;
+  heroToolbarCopy: string;
+  heroTitle: string;
+  heroDescription: string;
+}
+
+export interface HomeFeaturedReaction {
+  sortOrder: number;
+  contentSlug: string;
+  contentTitle: string;
+  categorySlug: CategorySlug;
+  categoryNameKo: string;
+  reactionCount: number;
+  totalViews: number;
+  reaction: ReactionVideo;
+}
+
 export interface HomePayload {
+  siteCopy: HomeSiteCopy;
   hero: HeroHighlight | null;
+  featuredReactions: HomeFeaturedReaction[];
   top10: HomeRankingItem[];
   popularByCategory: HomeSection[];
   updatedAt: string;
@@ -143,4 +167,53 @@ export interface InternalJobResult {
   summary: string;
   errors: string[];
   snapshotDate?: string;
+}
+
+export interface AdminContent {
+  id: number;
+  categoryId: number;
+  categorySlug: string;
+  categoryNameKo: string;
+  slug: string;
+  titleKo: string;
+  titleEn: string | null;
+  aliases: string[];
+  releaseYear: number | null;
+  thumbnailUrl: string | null;
+  description: string | null;
+  status: ContentStatus;
+  reactionCount: number;
+  totalViews: number;
+  latestReactionAt: string | null;
+}
+
+export interface AdminReactionVideo {
+  id: number;
+  youtubeVideoId: string;
+  contentId: number;
+  contentSlug: string;
+  contentTitleKo: string;
+  categorySlug: string;
+  categoryNameKo: string;
+  channelName: string;
+  originalTitle: string;
+  adminTitle: string | null;
+  adminDescription: string | null;
+  displayTitle: string;
+  thumbnailUrl: string | null;
+  publishedAt: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  youtubeUrl: string;
+  isFeatured: boolean;
+  featuredOrder: number;
+}
+
+export interface AdminDashboardPayload {
+  settings: HomeSiteCopy;
+  categories: Category[];
+  contents: AdminContent[];
+  featuredReactions: AdminReactionVideo[];
+  reactions: AdminReactionVideo[];
 }

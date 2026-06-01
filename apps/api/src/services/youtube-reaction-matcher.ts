@@ -7,12 +7,16 @@ const SEARCH_HINT_BY_CATEGORY: Record<CategorySlug, string> = {
   music: "song",
 };
 
+const DEFAULT_SEARCH_HINT = "korean content";
+
 const CONTEXT_TERMS_BY_CATEGORY: Record<CategorySlug, string[]> = {
   movie: ["movie", "film", "korean movie", "kmovie", "k movie"],
   drama: ["kdrama", "k drama", "korean drama", "gong yoo", "kim go eun"],
   webtoon: ["webtoon", "manhwa", "korean", "adaptation", "anime"],
   music: ["song", "music", "mv", "performance", "ost", "lyrics", "cover"],
 };
+
+const DEFAULT_CONTEXT_TERMS = ["korean", "reaction", "review", "content"];
 
 const REFERENCE_NOISE_PHRASES = [
   "first time watching",
@@ -113,7 +117,9 @@ const removeSeasonMarkers = (value: string) =>
   );
 
 const hasCategoryContext = (normalizedTitle: string, categorySlug: CategorySlug) =>
-  CONTEXT_TERMS_BY_CATEGORY[categorySlug].some((term) => normalizedTitle.includes(term));
+  (CONTEXT_TERMS_BY_CATEGORY[categorySlug] ?? DEFAULT_CONTEXT_TERMS).some((term) =>
+    normalizedTitle.includes(term),
+  );
 
 const matchesBasePhraseWithSeason = (
   normalizedTitle: string,
@@ -235,7 +241,7 @@ const matchesReferenceAnchor = (
 
 export const buildSearchKeywords = (content: ReactionMatcherContent) => {
   const anchors = buildReferenceAnchors(content);
-  const categoryHint = SEARCH_HINT_BY_CATEGORY[content.categorySlug];
+  const categoryHint = SEARCH_HINT_BY_CATEGORY[content.categorySlug] ?? DEFAULT_SEARCH_HINT;
   const queries: string[] = [];
 
   for (const anchor of anchors) {

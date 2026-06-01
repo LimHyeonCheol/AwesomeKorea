@@ -5,6 +5,7 @@ import type {
   Category,
   CategoryFilter,
   ContentSummary,
+  HomeSiteCopy,
   HomePayload,
   SortOrder,
 } from "@awesomekorea/shared";
@@ -22,6 +23,15 @@ import { apiClient } from "../lib/api-client";
 
 const FEATURED_REACTION_LIMIT = 4;
 const FEATURED_SLIDE_LIMIT = 4;
+const DEFAULT_SITE_COPY: HomeSiteCopy = {
+  brandName: "어썸코리아",
+  brandTagline: "Awesome Korea - 해외 반응 모음",
+  heroBadge: "관리자 추천",
+  heroToolbarCopy: "운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 살펴보세요.",
+  heroTitle: "지금 소개할 대표 반응을 운영자가 직접 편성합니다.",
+  heroDescription:
+    "대문 문구, 카테고리, 유튜브 제목과 소개글, 메인 대표 반응까지 모두 관리자에서 조정할 수 있습니다.",
+};
 
 const fallbackCategories: Category[] = MVP_CATEGORIES.map((category, index) => ({
   id: index + 1,
@@ -64,6 +74,24 @@ const buildFeaturedSlideTags = (content: ContentSummary, channelName: string) =>
       ].filter((value): value is string => Boolean(value)),
     ),
   ).slice(0, 5);
+
+const buildEditorialSlides = (home: HomePayload): HeroBannerSlide[] =>
+  home.featuredReactions.map((entry) => ({
+    categoryNameKo: entry.categoryNameKo,
+    contentSlug: entry.contentSlug,
+    contentTitle: entry.contentTitle,
+    message: entry.reaction.description ?? home.siteCopy.heroDescription,
+    overview:
+      entry.reaction.description ??
+      `${entry.contentTitle} 관련 대표 반응을 운영자가 메인에 직접 노출 중입니다.`,
+    primaryReaction: entry.reaction,
+    reactionCount: entry.reactionCount,
+    relatedReactions: [entry.reaction],
+    tags: Array.from(
+      new Set([entry.categoryNameKo, entry.contentTitle, entry.reaction.channelName, "관리자선정"]),
+    ),
+    totalViews: entry.totalViews,
+  }));
 
 const buildFeaturedSlides = async (home: HomePayload): Promise<HeroBannerSlide[]> => {
   const contentMap = buildContentSummaryMap(home);
@@ -120,10 +148,11 @@ const buildFeaturedSlides = async (home: HomePayload): Promise<HeroBannerSlide[]
 interface HomePageProps {
   homeAnchor: string | null;
   initialSort: SortOrder | null;
+  onOpenAdmin: () => void;
   onOpenContent: (slug: string) => void;
 }
 
-export function HomePage({ homeAnchor, initialSort, onOpenContent }: HomePageProps) {
+export function HomePage({ homeAnchor, initialSort, onOpenAdmin, onOpenContent }: HomePageProps) {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
   const [selectedSort, setSelectedSort] = useState<SortOrder>(initialSort ?? "popular");
 
@@ -148,11 +177,12 @@ export function HomePage({ homeAnchor, initialSort, onOpenContent }: HomePagePro
   const homeResource = useAsyncResource(() => apiClient.getHome(), [], {
     initialData: null,
   });
+  const editorialSlides = homeResource.data ? buildEditorialSlides(homeResource.data) : [];
   const featuredSlideResource = useAsyncResource<HeroBannerSlide[]>(
     () => (homeResource.data ? buildFeaturedSlides(homeResource.data) : Promise.resolve([])),
-    [homeResource.data?.updatedAt, homeResource.data?.hero?.contentSlug],
+    [homeResource.data?.updatedAt, homeResource.data?.hero?.contentSlug, editorialSlides.length],
     {
-      enabled: Boolean(homeResource.data),
+      enabled: Boolean(homeResource.data) && editorialSlides.length === 0,
       initialData: [],
     },
   );
@@ -188,10 +218,14 @@ export function HomePage({ homeAnchor, initialSort, onOpenContent }: HomePagePro
   };
 
   const categories = categoryResource.data?.items ?? fallbackCategories;
+  const siteCopy = homeResource.data?.siteCopy ?? DEFAULT_SITE_COPY;
 
   return (
     <div className="app-shell">
       <AppHeader
+        brandName={siteCopy.brandName}
+        brandTagline={siteCopy.brandTagline}
+        onOpenAdmin={onOpenAdmin}
         onOpenRanking={() => scrollToSection("ranking-section")}
         onOpenCategories={() => scrollToSection("category-section")}
         onOpenLatest={handleOpenLatest}
@@ -201,8 +235,11 @@ export function HomePage({ homeAnchor, initialSort, onOpenContent }: HomePagePro
         <div className="page-stack">
           <HeroBanner
             hero={homeResource.data?.hero ?? null}
-            isLoading={homeResource.isLoading || featuredSlideResource.isLoading}
-            slides={featuredSlideResource.data ?? []}
+            isLoading={
+              homeResource.isLoading || (editorialSlides.length === 0 && featuredSlideResource.isLoading)
+            }
+            siteCopy={siteCopy}
+            slides={editorialSlides.length > 0 ? editorialSlides : featuredSlideResource.data ?? []}
             onLatestClick={handleOpenLatest}
             onOpenContent={onOpenContent}
           />

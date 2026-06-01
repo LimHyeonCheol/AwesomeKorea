@@ -13,9 +13,14 @@ interface ContentRoute {
   kind: "content";
 }
 
-export type AppRoute = HomeRoute | ContentRoute;
+interface AdminRoute {
+  kind: "admin";
+}
+
+export type AppRoute = HomeRoute | ContentRoute | AdminRoute;
 
 const CONTENT_ROUTE_PATTERN = /^\/content\/([^/]+)$/;
+const ADMIN_ROUTE_PATTERN = /^\/admin\/?$/;
 
 const parseSort = (value: string | null): SortOrder | null => {
   if (value === "latest" || value === "popular") {
@@ -33,6 +38,12 @@ const parseRouteFromLocation = (): AppRoute => {
     return {
       kind: "content",
       contentSlug: decodeURIComponent(contentMatch[1]),
+    };
+  }
+
+  if (ADMIN_ROUTE_PATTERN.test(url.pathname)) {
+    return {
+      kind: "admin",
     };
   }
 
@@ -57,6 +68,10 @@ const updateLocation = (route: AppRoute) => {
 
   if (route.kind === "content") {
     url.pathname = `/content/${encodeURIComponent(route.contentSlug)}`;
+    url.search = "";
+    url.hash = "";
+  } else if (route.kind === "admin") {
+    url.pathname = "/admin";
     url.search = "";
     url.hash = "";
   } else {
@@ -128,8 +143,22 @@ export function useAppRoute() {
     });
   };
 
+  const openAdmin = () => {
+    const nextRoute: AdminRoute = {
+      kind: "admin",
+    };
+
+    updateLocation(nextRoute);
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    startTransition(() => {
+      setRoute(nextRoute);
+    });
+  };
+
   return {
     route,
+    openAdmin,
     openContent,
     openHome,
   };

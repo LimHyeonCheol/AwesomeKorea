@@ -154,6 +154,7 @@ const createReaction = (
   id,
   youtubeVideoId,
   title,
+  description: null,
   thumbnailUrl: null,
   publishedAt,
   viewCount,
@@ -318,6 +319,15 @@ const previewTop10: HomePayload["top10"] = [
 ];
 
 const previewHome: HomePayload = {
+  siteCopy: {
+    brandName: "어썸코리아",
+    brandTagline: "Awesome Korea - 해외 반응 모음",
+    heroBadge: "관리자 추천",
+    heroToolbarCopy: "운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 살펴보세요.",
+    heroTitle: "지금 소개할 대표 반응을 운영자가 직접 편성합니다.",
+    heroDescription:
+      "대문 문구, 카테고리, 유튜브 제목과 소개글, 메인 대표 반응까지 모두 관리자에서 조정할 수 있습니다.",
+  },
   hero: {
     contentSlug: "extreme-job",
     titleKo: "극한직업",
@@ -325,6 +335,28 @@ const previewHome: HomePayload = {
     reactionCount: 47,
     message: "오늘 가장 많이 본 반응 콘텐츠",
   },
+  featuredReactions: [
+    {
+      sortOrder: 1,
+      contentSlug: "extreme-job",
+      contentTitle: "극한직업",
+      categorySlug: "movie",
+      categoryNameKo: "영화",
+      reactionCount: 47,
+      totalViews: 2100000,
+      reaction: previewReactions["extreme-job"]![0]!,
+    },
+    {
+      sortOrder: 2,
+      contentSlug: "squid-game-2",
+      contentTitle: "오징어게임 S2",
+      categorySlug: "drama",
+      categoryNameKo: "드라마",
+      reactionCount: 110,
+      totalViews: 6100000,
+      reaction: previewReactions["squid-game-2"]![0]!,
+    },
+  ],
   top10: previewTop10,
   popularByCategory: [
     {

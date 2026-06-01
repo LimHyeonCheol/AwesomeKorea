@@ -293,6 +293,12 @@
   color: var(--color-text-muted);
 }
 
+.reaction-card__summary-description {
+  margin: 0.65rem 0 0;
+  color: var(--color-text-strong);
+  line-height: 1.65;
+}
+
 .reaction-card__summary-meta {
   display: flex;
   flex-wrap: wrap;

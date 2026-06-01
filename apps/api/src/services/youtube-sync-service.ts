@@ -13,6 +13,7 @@ import {
   containsKoreanCharacters,
   matchesContentReference,
 } from "./youtube-reaction-matcher";
+import { localizeReactionMetadata } from "./reaction-localization-service";
 
 interface YouTubeSearchItem {
   id?: {
@@ -30,8 +31,13 @@ interface YouTubeVideoResponse {
     snippet?: {
       channelId?: string;
       channelTitle?: string;
+      description?: string;
       defaultAudioLanguage?: string;
       defaultLanguage?: string;
+      localized?: {
+        description?: string;
+        title?: string;
+      };
       publishedAt?: string;
       thumbnails?: {
         high?: {
@@ -150,6 +156,7 @@ const fetchVideoDetails = async (apiKey: string, videoIds: string[]) => {
   url.search = new URLSearchParams({
     key: apiKey,
     part: "snippet,statistics",
+    hl: "ko",
     id: videoIds.join(","),
     maxResults: String(videoIds.length),
   }).toString();
@@ -161,6 +168,12 @@ const fetchVideoDetails = async (apiKey: string, videoIds: string[]) => {
 export const syncYoutubeReactions = async (
   env: {
     DB: D1Database;
+    DEEPL_API_KEY?: string;
+    DEEPL_API_URL?: string;
+    GOOGLE_TRANSLATE_API_KEY?: string;
+    PAPAGO_CLIENT_ID?: string;
+    PAPAGO_CLIENT_SECRET?: string;
+    TRANSLATION_PROVIDER?: string;
     YOUTUBE_API_KEY?: string;
   },
   options: SyncYoutubeOptions = {},
@@ -226,6 +239,7 @@ export const syncYoutubeReactions = async (
         }
 
         const title = video.snippet?.title ?? "";
+        const description = video.snippet?.description?.trim() || null;
         const channelTitle = video.snippet?.channelTitle ?? "Unknown Channel";
         const detectedLanguage =
           video.snippet?.defaultAudioLanguage ?? video.snippet?.defaultLanguage ?? null;
@@ -247,11 +261,29 @@ export const syncYoutubeReactions = async (
           continue;
         }
 
+        const localization = await localizeReactionMetadata(env, {
+          title,
+          description,
+          localizedTitleCandidate: video.snippet?.localized?.title ?? null,
+          localizedDescriptionCandidate: video.snippet?.localized?.description ?? null,
+          sourceLanguage: detectedLanguage,
+          channelName: channelTitle,
+          contentTitleKo: content.titleKo,
+          contentTitleEn: content.titleEn,
+          categoryName: content.categoryNameKo,
+          aliases: content.aliases,
+        });
+
         await upsertReactionVideo(env.DB, {
           youtubeVideoId,
           contentId: content.id,
           channelId,
           title,
+          description,
+          localizedTitle: localization.title.localizedText,
+          localizedTitleSource: localization.title.source,
+          localizedDescription: localization.description.localizedText,
+          localizedDescriptionSource: localization.description.source,
           thumbnailUrl:
             video.snippet?.thumbnails?.high?.url ?? video.snippet?.thumbnails?.medium?.url ?? null,
           publishedAt: video.snippet?.publishedAt ?? new Date().toISOString(),

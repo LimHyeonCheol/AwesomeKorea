@@ -7,6 +7,7 @@ import type {
   PaginatedResponse,
   ReactionVideo,
   SortOrder,
+  TranslationSource,
 } from "@awesomekorea/shared";
 
 import { CATEGORY_NAME_BY_SLUG, type CategorySlug } from "@awesomekorea/shared";
@@ -63,18 +64,34 @@ interface ReactionVideoRow {
   channelId?: string | null;
   channelName: string;
   commentCount: number;
-  description: string | null;
+  displayDescription: string | null;
+  displayTitle: string;
+  descriptionSource: string | null;
   id: number;
   likeCount: number;
+  originalDescription: string | null;
+  originalTitle: string;
   publishedAt: string;
   thumbnailUrl: string | null;
-  title: string;
+  titleSource: string | null;
   viewCount: number;
   youtubeUrl: string;
   youtubeVideoId: string;
 }
 
 interface StoredReactionTitleRow {
+  title: string;
+  youtubeVideoId: string;
+}
+
+interface ReactionTranslationContextRow {
+  categoryNameKo: string;
+  channelName: string;
+  commentCount: number;
+  contentTitleEn: string | null;
+  contentTitleKo: string;
+  description: string | null;
+  detectedLanguage: string | null;
   title: string;
   youtubeVideoId: string;
 }
@@ -102,13 +119,30 @@ export interface UpsertReactionVideoInput {
   commentCount: number;
   contentId: number;
   detectedLanguage?: string | null;
+  description?: string | null;
   isOverseasReaction: boolean;
   likeCount: number;
+  localizedDescription?: string | null;
+  localizedDescriptionSource?: "machine" | "youtube_localized" | null;
+  localizedTitle?: string | null;
+  localizedTitleSource?: "machine" | "youtube_localized" | null;
   publishedAt: string;
   thumbnailUrl?: string | null;
   title: string;
   viewCount: number;
   youtubeUrl: string;
+  youtubeVideoId: string;
+}
+
+export interface ReactionTranslationContext {
+  categoryNameKo: string;
+  channelName: string;
+  commentCount: number;
+  contentTitleEn: string | null;
+  contentTitleKo: string;
+  description: string | null;
+  detectedLanguage: string | null;
+  title: string;
   youtubeVideoId: string;
 }
 
@@ -119,6 +153,22 @@ const buildYoutubeWatchUrl = (youtubeVideoId: string) =>
 
 const buildYoutubeEmbedUrl = (youtubeVideoId: string) =>
   `https://www.youtube-nocookie.com/embed/${youtubeVideoId}?playsinline=1&rel=0&modestbranding=1`;
+
+const toTranslationSource = (
+  value: unknown,
+  fallback: TranslationSource,
+): TranslationSource => {
+  if (
+    value === "manual" ||
+    value === "youtube_localized" ||
+    value === "machine" ||
+    value === "original"
+  ) {
+    return value;
+  }
+
+  return fallback;
+};
 
 const mapCategory = (row: CategoryRow): Category => ({
   id: toNumber(row.id),
@@ -159,8 +209,18 @@ const mapRankingItem = (row: RankingRow): HomeRankingItem => ({
 const mapReactionVideo = (row: ReactionVideoRow): ReactionVideo => ({
   id: toNumber(row.id),
   youtubeVideoId: toStringValue(row.youtubeVideoId),
-  title: toStringValue(row.title),
-  description: toNullableString(row.description),
+  title: toStringValue(row.displayTitle),
+  titleOriginal: toStringValue(row.originalTitle),
+  titleTranslationSource: toTranslationSource(row.titleSource, "original"),
+  hasTitleTranslation: toStringValue(row.displayTitle) !== toStringValue(row.originalTitle),
+  description: toNullableString(row.displayDescription),
+  descriptionOriginal: toNullableString(row.originalDescription),
+  descriptionTranslationSource: toNullableString(row.displayDescription)
+    ? toTranslationSource(row.descriptionSource, "original")
+    : null,
+  hasDescriptionTranslation:
+    toNullableString(row.displayDescription) !== null &&
+    toNullableString(row.displayDescription) !== toNullableString(row.originalDescription),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   publishedAt: toStringValue(row.publishedAt),
   viewCount: toNumber(row.viewCount),
@@ -507,8 +567,21 @@ export const getFeaturedReactionByContentSlug = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          COALESCE(rv.admin_title, rv.title) AS title,
-          rv.admin_description AS description,
+          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
+          CASE
+            WHEN rv.admin_title IS NOT NULL AND TRIM(rv.admin_title) <> '' THEN 'manual'
+            WHEN rv.localized_title IS NOT NULL AND TRIM(rv.localized_title) <> '' THEN rv.localized_title_source
+            ELSE 'original'
+          END AS titleSource,
+          rv.title AS originalTitle,
+          COALESCE(rv.admin_description, rv.localized_description, rv.description) AS displayDescription,
+          CASE
+            WHEN rv.admin_description IS NOT NULL AND TRIM(rv.admin_description) <> '' THEN 'manual'
+            WHEN rv.localized_description IS NOT NULL AND TRIM(rv.localized_description) <> '' THEN rv.localized_description_source
+            WHEN rv.description IS NOT NULL AND TRIM(rv.description) <> '' THEN 'original'
+            ELSE NULL
+          END AS descriptionSource,
+          rv.description AS originalDescription,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,
@@ -554,8 +627,21 @@ export const getReactionsByContentSlug = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          COALESCE(rv.admin_title, rv.title) AS title,
-          rv.admin_description AS description,
+          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
+          CASE
+            WHEN rv.admin_title IS NOT NULL AND TRIM(rv.admin_title) <> '' THEN 'manual'
+            WHEN rv.localized_title IS NOT NULL AND TRIM(rv.localized_title) <> '' THEN rv.localized_title_source
+            ELSE 'original'
+          END AS titleSource,
+          rv.title AS originalTitle,
+          COALESCE(rv.admin_description, rv.localized_description, rv.description) AS displayDescription,
+          CASE
+            WHEN rv.admin_description IS NOT NULL AND TRIM(rv.admin_description) <> '' THEN 'manual'
+            WHEN rv.localized_description IS NOT NULL AND TRIM(rv.localized_description) <> '' THEN rv.localized_description_source
+            WHEN rv.description IS NOT NULL AND TRIM(rv.description) <> '' THEN 'original'
+            ELSE NULL
+          END AS descriptionSource,
+          rv.description AS originalDescription,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,
@@ -611,8 +697,21 @@ export const getReactionByYoutubeVideoId = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          COALESCE(rv.admin_title, rv.title) AS title,
-          rv.admin_description AS description,
+          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
+          CASE
+            WHEN rv.admin_title IS NOT NULL AND TRIM(rv.admin_title) <> '' THEN 'manual'
+            WHEN rv.localized_title IS NOT NULL AND TRIM(rv.localized_title) <> '' THEN rv.localized_title_source
+            ELSE 'original'
+          END AS titleSource,
+          rv.title AS originalTitle,
+          COALESCE(rv.admin_description, rv.localized_description, rv.description) AS displayDescription,
+          CASE
+            WHEN rv.admin_description IS NOT NULL AND TRIM(rv.admin_description) <> '' THEN 'manual'
+            WHEN rv.localized_description IS NOT NULL AND TRIM(rv.localized_description) <> '' THEN rv.localized_description_source
+            WHEN rv.description IS NOT NULL AND TRIM(rv.description) <> '' THEN 'original'
+            ELSE NULL
+          END AS descriptionSource,
+          rv.description AS originalDescription,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,
@@ -633,6 +732,56 @@ export const getReactionByYoutubeVideoId = async (
     .first<ReactionVideoRow>();
 
   return row ? mapReactionVideo(row) : null;
+};
+
+export const getReactionTranslationContextByYoutubeVideoId = async (
+  db: D1Database,
+  youtubeVideoId: string,
+): Promise<ReactionTranslationContext | null> => {
+  const row = await db
+    .prepare(
+      `
+        SELECT
+          rv.youtube_video_id AS youtubeVideoId,
+          rv.title AS title,
+          rv.description AS description,
+          rv.comment_count AS commentCount,
+          rv.detected_language AS detectedLanguage,
+          ch.title AS channelName,
+          c.title_ko AS contentTitleKo,
+          c.title_en AS contentTitleEn,
+          cat.name_ko AS categoryNameKo
+        FROM reaction_videos rv
+        JOIN channels ch
+          ON ch.id = rv.channel_id
+        JOIN contents c
+          ON c.id = rv.content_id
+        JOIN categories cat
+          ON cat.id = c.category_id
+        WHERE rv.youtube_video_id = ?
+          AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+        LIMIT 1
+      `,
+    )
+    .bind(youtubeVideoId)
+    .first<ReactionTranslationContextRow>();
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    youtubeVideoId: toStringValue(row.youtubeVideoId),
+    title: toStringValue(row.title),
+    description: toNullableString(row.description),
+    commentCount: toNumber(row.commentCount),
+    detectedLanguage: toNullableString(row.detectedLanguage),
+    channelName: toStringValue(row.channelName),
+    contentTitleKo: toStringValue(row.contentTitleKo),
+    contentTitleEn: toNullableString(row.contentTitleEn),
+    categoryNameKo: toStringValue(row.categoryNameKo),
+  };
 };
 
 export const getActiveContentsForSync = async (db: D1Database): Promise<SyncContent[]> => {
@@ -791,6 +940,11 @@ export const upsertReactionVideo = async (
           content_id,
           channel_id,
           title,
+          description,
+          localized_title,
+          localized_title_source,
+          localized_description,
+          localized_description_source,
           thumbnail_url,
           published_at,
           view_count,
@@ -801,11 +955,33 @@ export const upsertReactionVideo = async (
           youtube_url,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(youtube_video_id) DO UPDATE SET
           content_id = excluded.content_id,
           channel_id = excluded.channel_id,
           title = excluded.title,
+          description = excluded.description,
+          localized_title = CASE
+            WHEN reaction_videos.title <> excluded.title THEN excluded.localized_title
+            ELSE COALESCE(excluded.localized_title, reaction_videos.localized_title)
+          END,
+          localized_title_source = CASE
+            WHEN reaction_videos.title <> excluded.title THEN excluded.localized_title_source
+            ELSE COALESCE(excluded.localized_title_source, reaction_videos.localized_title_source)
+          END,
+          localized_description = CASE
+            WHEN COALESCE(reaction_videos.description, '') <> COALESCE(excluded.description, '')
+              THEN excluded.localized_description
+            ELSE COALESCE(excluded.localized_description, reaction_videos.localized_description)
+          END,
+          localized_description_source = CASE
+            WHEN COALESCE(reaction_videos.description, '') <> COALESCE(excluded.description, '')
+              THEN excluded.localized_description_source
+            ELSE COALESCE(
+              excluded.localized_description_source,
+              reaction_videos.localized_description_source
+            )
+          END,
           thumbnail_url = excluded.thumbnail_url,
           published_at = excluded.published_at,
           view_count = excluded.view_count,
@@ -822,6 +998,11 @@ export const upsertReactionVideo = async (
       input.contentId,
       input.channelId,
       input.title,
+      input.description ?? null,
+      input.localizedTitle ?? null,
+      input.localizedTitleSource ?? null,
+      input.localizedDescription ?? null,
+      input.localizedDescriptionSource ?? null,
       input.thumbnailUrl ?? null,
       input.publishedAt,
       input.viewCount,

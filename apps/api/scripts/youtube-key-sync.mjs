@@ -17,6 +17,14 @@ const DEFAULT_KEY_FILE_CANDIDATES = [
 ];
 
 const DEV_VARS_PATH = path.join(appDir, ".dev.vars");
+const OPTIONAL_TRANSLATION_SECRET_KEYS = [
+  "TRANSLATION_PROVIDER",
+  "PAPAGO_CLIENT_ID",
+  "PAPAGO_CLIENT_SECRET",
+  "DEEPL_API_KEY",
+  "DEEPL_API_URL",
+  "GOOGLE_TRANSLATE_API_KEY",
+];
 
 const stripWrappingQuotes = (value) => {
   if (
@@ -212,4 +220,47 @@ export const syncInternalApiTokenSecret = () => {
   return {
     source,
   }
+};
+
+const loadOptionalEnvVar = (key) => {
+  const envValue = process.env[key]?.trim();
+
+  if (envValue) {
+    return {
+      source: `process.env.${key}`,
+      value: envValue,
+    };
+  }
+
+  const currentContent = fs.existsSync(DEV_VARS_PATH) ? fs.readFileSync(DEV_VARS_PATH, "utf8") : "";
+  const existingValue = readEnvVar(currentContent, key);
+
+  if (existingValue) {
+    return {
+      source: path.relative(repoDir, DEV_VARS_PATH) || DEV_VARS_PATH,
+      value: existingValue,
+    };
+  }
+
+  return null;
+};
+
+export const syncOptionalTranslationSecrets = () => {
+  const synced = [];
+
+  for (const key of OPTIONAL_TRANSLATION_SECRET_KEYS) {
+    const loaded = loadOptionalEnvVar(key);
+
+    if (!loaded) {
+      continue;
+    }
+
+    putCloudflareSecret(key, loaded.value);
+    synced.push({
+      key,
+      source: loaded.source,
+    });
+  }
+
+  return synced;
 };

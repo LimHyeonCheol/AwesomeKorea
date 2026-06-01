@@ -19,7 +19,7 @@ import {
   getFeaturedReactionByContentSlug,
   getContentList,
   getHomePayload,
-  getReactionByYoutubeVideoId,
+  getReactionTranslationContextByYoutubeVideoId,
   getReactionsByContentSlug,
 } from "./repositories/catalog-repository";
 import { bumpCacheVersion, withCache } from "./services/cache-service";
@@ -27,6 +27,8 @@ import { ensureBootstrapContentData } from "./services/bootstrap-service";
 import { rebuildRankings } from "./services/ranking-service";
 import {
   createUnavailableCommentsPayload,
+  createUnavailableRepliesPayload,
+  getYoutubeReactionCommentReplies,
   getYoutubeReactionComments,
   YoutubeCommentsUnavailableError,
 } from "./services/youtube-comments-service";
@@ -394,6 +396,7 @@ app.get("/api/contents/:slug/reactions", async (c) => {
 app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
   await ensureBootstrapContentData(c.env);
   const youtubeVideoId = c.req.param("youtubeVideoId");
+  const limit = clampLimit(c.req.query("limit"), 20, 50);
 
   if (!YOUTUBE_VIDEO_ID_PATTERN.test(youtubeVideoId)) {
     throw new HTTPException(400, {
@@ -401,9 +404,9 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
     });
   }
 
-  const reaction = await getReactionByYoutubeVideoId(c.env.DB, youtubeVideoId);
+  const reactionContext = await getReactionTranslationContextByYoutubeVideoId(c.env.DB, youtubeVideoId);
 
-  if (!reaction) {
+  if (!reactionContext) {
     throw new HTTPException(404, {
       message: "댓글을 불러올 반응 영상을 찾을 수 없어요.",
     });
@@ -413,8 +416,9 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
     return c.json(
       createUnavailableCommentsPayload(
         youtubeVideoId,
-        reaction.commentCount,
+        reactionContext.commentCount,
         "댓글 API 키가 설정되지 않아 지금은 댓글을 불러올 수 없어요.",
+        limit,
       ),
     );
   }
@@ -422,13 +426,14 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
   try {
     const payload = await withCache(
       c.env.CONTENT_CACHE,
-      `reaction-comments:${youtubeVideoId}:${reaction.commentCount}`,
+      `reaction-comments:${youtubeVideoId}:ko:${limit}:v${reactionContext.commentCount}`,
       REACTION_COMMENTS_CACHE_TTL_SECONDS,
       () =>
         getYoutubeReactionComments({
           apiKey: c.env.YOUTUBE_API_KEY as string,
-          totalCommentCount: reaction.commentCount,
-          videoId: youtubeVideoId,
+          context: reactionContext,
+          env: c.env,
+          limit,
         }),
     );
 
@@ -436,7 +441,74 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
   } catch (error) {
     if (error instanceof YoutubeCommentsUnavailableError) {
       return c.json(
-        createUnavailableCommentsPayload(youtubeVideoId, reaction.commentCount, error.message),
+        createUnavailableCommentsPayload(
+          youtubeVideoId,
+          reactionContext.commentCount,
+          error.message,
+          limit,
+        ),
+        200,
+      );
+    }
+
+    throw error;
+  }
+});
+
+app.get("/api/reactions/:youtubeVideoId/comments/:commentId/replies", async (c) => {
+  await ensureBootstrapContentData(c.env);
+  const youtubeVideoId = c.req.param("youtubeVideoId");
+  const commentId = c.req.param("commentId");
+
+  if (!YOUTUBE_VIDEO_ID_PATTERN.test(youtubeVideoId)) {
+    throw new HTTPException(400, {
+      message: "?좏슚???좏뒠釉??곸긽 ID媛 ?꾨땲?먯슂.",
+    });
+  }
+
+  if (!commentId) {
+    throw new HTTPException(400, {
+      message: "?볤? ID媛 ?꾩슂?⑸땲??",
+    });
+  }
+
+  const reactionContext = await getReactionTranslationContextByYoutubeVideoId(c.env.DB, youtubeVideoId);
+
+  if (!reactionContext) {
+    throw new HTTPException(404, {
+      message: "?볤???遺덈윭??諛섏쓳 ?곸긽??李얠쓣 ???놁뼱??",
+    });
+  }
+
+  if (!c.env.YOUTUBE_API_KEY) {
+    return c.json(
+      createUnavailableRepliesPayload(
+        youtubeVideoId,
+        commentId,
+        "?볤? API ?ㅺ? ?ㅼ젙?섏? ?딆븘 吏湲덉? ?듦??遺덈윭?????놁뼱??",
+      ),
+    );
+  }
+
+  try {
+    const payload = await withCache(
+      c.env.CONTENT_CACHE,
+      `reaction-comment-replies:${youtubeVideoId}:${encodeURIComponent(commentId)}:ko`,
+      REACTION_COMMENTS_CACHE_TTL_SECONDS,
+      () =>
+        getYoutubeReactionCommentReplies({
+          apiKey: c.env.YOUTUBE_API_KEY as string,
+          commentId,
+          context: reactionContext,
+          env: c.env,
+        }),
+    );
+
+    return c.json(payload);
+  } catch (error) {
+    if (error instanceof YoutubeCommentsUnavailableError) {
+      return c.json(
+        createUnavailableRepliesPayload(youtubeVideoId, commentId, error.message),
         200,
       );
     }

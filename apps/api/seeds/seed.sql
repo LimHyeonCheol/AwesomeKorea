@@ -137,3 +137,39 @@ SET
   is_featured_home = 1,
   featured_home_order = 3
 WHERE youtube_video_id = 'react-005';
+
+UPDATE reaction_videos
+SET
+  description = 'They were surprised by how quickly the comedy escalated into action and how sharp the audience reactions were.',
+  localized_title = '미국 채널이 본 극한직업 첫 반응',
+  localized_title_source = 'machine',
+  localized_description = '코미디가 액션으로 빠르게 전환되는 흐름과 관객 반응이 특히 인상적이었다는 소개글입니다.',
+  localized_description_source = 'machine'
+WHERE youtube_video_id = 'react-001';
+
+UPDATE reaction_videos
+SET
+  description = 'The hosts could not believe how energetic the pacing was for a first-time watch.',
+  localized_title = '미국 시청자들의 극한직업 첫 감상',
+  localized_title_source = 'machine',
+  localized_description = '처음 보는 미국 시청자들이 빠른 전개와 에너지에 놀랐다는 소개글입니다.',
+  localized_description_source = 'machine'
+WHERE youtube_video_id = 'react-002';
+
+UPDATE reaction_videos
+SET
+  description = 'A trailer reaction focused on the new season scale, character tension, and audience hype.',
+  localized_title = '오징어 게임 시즌 2 트레일러 반응',
+  localized_title_source = 'machine',
+  localized_description = '새 시즌의 스케일과 긴장감, 기대 반응을 중심으로 한 트레일러 리액션 소개글입니다.',
+  localized_description_source = 'machine'
+WHERE youtube_video_id = 'react-008';
+
+UPDATE reaction_videos
+SET
+  description = 'The channel breaks down the vocal layers and performance choices from the music video.',
+  localized_title = 'APT. 뮤직비디오 보컬 분석 리액션',
+  localized_title_source = 'machine',
+  localized_description = '뮤직비디오의 보컬 레이어와 퍼포먼스 포인트를 함께 분석하는 소개글입니다.',
+  localized_description_source = 'machine'
+WHERE youtube_video_id = 'react-005';

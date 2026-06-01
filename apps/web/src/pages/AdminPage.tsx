@@ -901,6 +901,12 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       <div className="admin-card__head">
                         <div>
                           <p className="admin-card__title">{reaction.displayTitle}</p>
+                          <p className="admin-card__subtitle">원문: {reaction.originalTitle}</p>
+                          {reaction.localizedTitle ? (
+                            <p className="admin-card__subtitle">
+                              자동 번역({reaction.localizedTitleSource ?? "machine"}): {reaction.localizedTitle}
+                            </p>
+                          ) : null}
                           <p className="admin-card__subtitle">
                             {reaction.categoryNameKo} · {reaction.contentTitleKo} · {reaction.channelName}
                           </p>
@@ -918,7 +924,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           <input
                             className="admin-input"
                             value={reaction.adminTitle ?? ""}
-                            placeholder={reaction.originalTitle}
+                            placeholder={reaction.localizedTitle ?? reaction.originalTitle}
                             onChange={(event) =>
                               handleReactionChange(reaction.id, "adminTitle", event.target.value)
                             }

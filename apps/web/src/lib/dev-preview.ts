@@ -1,6 +1,7 @@
 import type {
   Category,
   ContentDetailPayload,
+  ReactionCommentRepliesPayload,
   ReactionCommentsPayload,
   ContentSummary,
   HomePayload,
@@ -150,11 +151,32 @@ const createReaction = (
   publishedAt: string,
   viewCount: number,
   channelName: string,
+  options: {
+    description?: string | null;
+    descriptionOriginal?: string | null;
+    titleOriginal?: string;
+    titleTranslationSource?: ReactionVideo["titleTranslationSource"];
+  } = {},
 ): ReactionVideo => ({
   id,
   youtubeVideoId,
   title,
-  description: null,
+  titleOriginal: options.titleOriginal ?? title,
+  titleTranslationSource:
+    options.titleTranslationSource ??
+    ((options.titleOriginal ?? title) === title ? "original" : "machine"),
+  hasTitleTranslation: (options.titleOriginal ?? title) !== title,
+  description: options.description ?? null,
+  descriptionOriginal: options.descriptionOriginal ?? options.description ?? null,
+  descriptionTranslationSource:
+    options.description && options.descriptionOriginal && options.description !== options.descriptionOriginal
+      ? "machine"
+      : options.description
+        ? "original"
+        : null,
+  hasDescriptionTranslation:
+    Boolean(options.description) &&
+    (options.descriptionOriginal ?? options.description ?? null) !== options.description,
   thumbnailUrl: null,
   publishedAt,
   viewCount,
@@ -224,12 +246,13 @@ const previewReactions: Record<string, ReactionVideo[]> = {
 
 const previewComments: Record<string, ReactionCommentsPayload> = {
   "react-001": {
+    locale: "ko",
     videoId: "react-001",
     status: "ok",
     order: "relevance",
-    strategy: "top50",
+    strategy: "topN",
     fetchedAll: false,
-    pageSize: 50,
+    pageSize: 20,
     fetchedCount: 3,
     totalCommentCount: 1400,
     estimatedQuotaUnits: 1,
@@ -242,6 +265,10 @@ const previewComments: Record<string, ReactionCommentsPayload> = {
         authorProfileImageUrl: null,
         text:
           "이 영화는 액션 템포도 좋지만 코미디 타이밍이 정말 좋네요. 해외 반응이 많은 이유를 알겠어요.",
+        originalText:
+          "???곹솕???≪뀡 ?쒗룷??醫뗭?留?肄붾?????대컢???뺣쭚 醫뗫꽕?? ?댁쇅 諛섏쓳??留롮? ?댁쑀瑜??뚭쿋?댁슂.",
+        translationSource: "original",
+        hasTranslation: false,
         likeCount: 328,
         publishedAt: "2026-05-30T02:12:00.000Z",
         updatedAt: "2026-05-30T02:12:00.000Z",
@@ -252,6 +279,9 @@ const previewComments: Record<string, ReactionCommentsPayload> = {
             authorDisplayName: "KoreanCinemaClub",
             authorProfileImageUrl: null,
             text: "특히 후반부 전개가 외국 시청자에게도 잘 먹히는 것 같아요.",
+            originalText: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
+            translationSource: "original",
+            hasTranslation: false,
             likeCount: 41,
             publishedAt: "2026-05-30T03:05:00.000Z",
           },
@@ -262,6 +292,9 @@ const previewComments: Record<string, ReactionCommentsPayload> = {
         authorDisplayName: "FirstTimeWatcher",
         authorProfileImageUrl: null,
         text: "처음 봤는데 생각보다 더 세련된 연출이라 놀랐습니다.",
+        originalText: "泥섏쓬 遊ㅻ뒗???앷컖蹂대떎 ???몃젴???곗텧?대씪 ??먯뒿?덈떎.",
+        translationSource: "original",
+        hasTranslation: false,
         likeCount: 174,
         publishedAt: "2026-05-30T04:20:00.000Z",
         updatedAt: "2026-05-30T04:20:00.000Z",
@@ -273,6 +306,9 @@ const previewComments: Record<string, ReactionCommentsPayload> = {
         authorDisplayName: "LaughTrackDaily",
         authorProfileImageUrl: null,
         text: "채널 주인장 리액션도 좋지만 관객 반응 같이 보는 재미가 있네요.",
+        originalText: "梨꾨꼸 二쇱씤??由ъ븸?섎룄 醫뗭?留?愿媛?諛섏쓳 媛숈씠 蹂대뒗 ?щ?媛 ?덈꽕??",
+        translationSource: "original",
+        hasTranslation: false,
         likeCount: 102,
         publishedAt: "2026-05-30T06:10:00.000Z",
         updatedAt: "2026-05-30T06:10:00.000Z",
@@ -283,10 +319,60 @@ const previewComments: Record<string, ReactionCommentsPayload> = {
             authorDisplayName: "GlobalViewer",
             authorProfileImageUrl: null,
             text: "그래서 이 앱에서 댓글 같이 보는 구성이 잘 어울려요.",
+            originalText: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
+            translationSource: "original",
+            hasTranslation: false,
             likeCount: 18,
             publishedAt: "2026-05-30T06:44:00.000Z",
           },
         ],
+      },
+    ],
+  },
+};
+
+const previewReplies: Record<string, ReactionCommentRepliesPayload> = {
+  "react-001:preview-comment-1": {
+    locale: "ko",
+    videoId: "react-001",
+    commentId: "preview-comment-1",
+    status: "ok",
+    fetchedCount: 1,
+    estimatedQuotaUnits: 1,
+    message: "답글을 한국어로 정리했어요.",
+    items: [
+      {
+        id: "preview-comment-1-reply-1",
+        authorDisplayName: "KoreanCinemaClub",
+        authorProfileImageUrl: null,
+        text: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
+        originalText: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
+        translationSource: "original",
+        hasTranslation: false,
+        likeCount: 41,
+        publishedAt: "2026-05-30T03:05:00.000Z",
+      },
+    ],
+  },
+  "react-001:preview-comment-3": {
+    locale: "ko",
+    videoId: "react-001",
+    commentId: "preview-comment-3",
+    status: "ok",
+    fetchedCount: 1,
+    estimatedQuotaUnits: 1,
+    message: "답글을 한국어로 정리했어요.",
+    items: [
+      {
+        id: "preview-comment-3-reply-1",
+        authorDisplayName: "GlobalViewer",
+        authorProfileImageUrl: null,
+        text: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
+        originalText: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
+        translationSource: "original",
+        hasTranslation: false,
+        likeCount: 18,
+        publishedAt: "2026-05-30T06:44:00.000Z",
       },
     ],
   },
@@ -507,6 +593,30 @@ export const getDevPreviewPayload = (requestPath: string) => {
 
   const commentMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments$/);
 
+  const replyMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments\/([^/]+)\/replies$/);
+
+  if (replyMatch) {
+    const rawVideoId = replyMatch[1];
+    const rawCommentId = replyMatch[2];
+
+    if (!rawVideoId || !rawCommentId) {
+      return null;
+    }
+
+    return (
+      previewReplies[`${decodeURIComponent(rawVideoId)}:${decodeURIComponent(rawCommentId)}`] ?? {
+        locale: "ko",
+        videoId: decodeURIComponent(rawVideoId),
+        commentId: decodeURIComponent(rawCommentId),
+        status: "empty",
+        fetchedCount: 0,
+        estimatedQuotaUnits: 1,
+        message: "?꾩쭅 ?쒖떆???듦????놁뼱??",
+        items: [],
+      }
+    );
+  }
+
   if (commentMatch) {
     const rawVideoId = commentMatch[1];
 
@@ -515,12 +625,13 @@ export const getDevPreviewPayload = (requestPath: string) => {
     }
 
     return previewComments[decodeURIComponent(rawVideoId)] ?? {
+      locale: "ko",
       videoId: decodeURIComponent(rawVideoId),
       status: "empty",
       order: "relevance",
       strategy: "full",
       fetchedAll: true,
-      pageSize: 50,
+      pageSize: 20,
       fetchedCount: 0,
       totalCommentCount: 0,
       estimatedQuotaUnits: 0,

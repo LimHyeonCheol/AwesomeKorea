@@ -1,4 +1,9 @@
-import type { HomeFeaturedReaction, HomeSiteCopy, ReactionVideo } from "@awesomekorea/shared";
+import type {
+  HomeFeaturedReaction,
+  HomeSiteCopy,
+  ReactionVideo,
+  TranslationSource,
+} from "@awesomekorea/shared";
 
 import { toNullableString, toNumber, toStringValue } from "../lib/serializers";
 
@@ -14,14 +19,18 @@ interface FeaturedReactionRow {
   commentCount: number;
   contentSlug: string;
   contentTitle: string;
-  description: string | null;
+  displayDescription: string | null;
+  descriptionSource: string | null;
   displayTitle: string;
   featuredOrder: number;
   id: number;
   likeCount: number;
+  originalDescription: string | null;
+  originalTitle: string;
   publishedAt: string;
   reactionCount: number;
   thumbnailUrl: string | null;
+  titleSource: string | null;
   totalViews: number;
   viewCount: number;
   youtubeVideoId: string;
@@ -32,6 +41,22 @@ const buildYoutubeWatchUrl = (youtubeVideoId: string) =>
 
 const buildYoutubeEmbedUrl = (youtubeVideoId: string) =>
   `https://www.youtube-nocookie.com/embed/${youtubeVideoId}?playsinline=1&rel=0&modestbranding=1`;
+
+const toTranslationSource = (
+  value: unknown,
+  fallback: TranslationSource,
+): TranslationSource => {
+  if (
+    value === "manual" ||
+    value === "youtube_localized" ||
+    value === "machine" ||
+    value === "original"
+  ) {
+    return value;
+  }
+
+  return fallback;
+};
 
 export const HOME_SITE_COPY_DEFAULTS: HomeSiteCopy = {
   brandName: "어썸코리아",
@@ -56,7 +81,17 @@ const mapReactionVideo = (row: FeaturedReactionRow): ReactionVideo => ({
   id: toNumber(row.id),
   youtubeVideoId: toStringValue(row.youtubeVideoId),
   title: toStringValue(row.displayTitle),
-  description: toNullableString(row.description),
+  titleOriginal: toStringValue(row.originalTitle),
+  titleTranslationSource: toTranslationSource(row.titleSource, "original"),
+  hasTitleTranslation: toStringValue(row.displayTitle) !== toStringValue(row.originalTitle),
+  description: toNullableString(row.displayDescription),
+  descriptionOriginal: toNullableString(row.originalDescription),
+  descriptionTranslationSource: toNullableString(row.displayDescription)
+    ? toTranslationSource(row.descriptionSource, "original")
+    : null,
+  hasDescriptionTranslation:
+    toNullableString(row.displayDescription) !== null &&
+    toNullableString(row.displayDescription) !== toNullableString(row.originalDescription),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   publishedAt: toStringValue(row.publishedAt),
   viewCount: toNumber(row.viewCount),
@@ -146,8 +181,21 @@ export const getFeaturedHomeReactions = async (
         SELECT
           rv.id AS id,
           rv.youtube_video_id AS youtubeVideoId,
-          COALESCE(rv.admin_title, rv.title) AS displayTitle,
-          rv.admin_description AS description,
+          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
+          CASE
+            WHEN rv.admin_title IS NOT NULL AND TRIM(rv.admin_title) <> '' THEN 'manual'
+            WHEN rv.localized_title IS NOT NULL AND TRIM(rv.localized_title) <> '' THEN rv.localized_title_source
+            ELSE 'original'
+          END AS titleSource,
+          rv.title AS originalTitle,
+          COALESCE(rv.admin_description, rv.localized_description, rv.description) AS displayDescription,
+          CASE
+            WHEN rv.admin_description IS NOT NULL AND TRIM(rv.admin_description) <> '' THEN 'manual'
+            WHEN rv.localized_description IS NOT NULL AND TRIM(rv.localized_description) <> '' THEN rv.localized_description_source
+            WHEN rv.description IS NOT NULL AND TRIM(rv.description) <> '' THEN 'original'
+            ELSE NULL
+          END AS descriptionSource,
+          rv.description AS originalDescription,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,

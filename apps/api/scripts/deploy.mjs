@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import {
   appDir,
   syncInternalApiTokenSecret,
+  syncOptionalTranslationSecrets,
   syncCloudflareSecret,
   syncLocalDevVars,
   wranglerPath,
@@ -17,7 +18,21 @@ console.log("[deploy:api] Cloudflare Worker secret 을 동기화합니다.");
 
 const youtubeSecret = syncCloudflareSecret();
 const internalTokenSecret = syncInternalApiTokenSecret();
+const translationSecrets = syncOptionalTranslationSecrets();
 const { configPath } = buildProductionConfig();
+
+const translationSecretSummary =
+  translationSecrets.length > 0
+    ? translationSecrets.map((secret) => `${secret.key}(${secret.source})`).join(", ")
+    : null;
+
+if (translationSecretSummary) {
+  console.log(`[deploy:api] Optional translation secrets synced: ${translationSecretSummary}`);
+} else {
+  console.log(
+    "[deploy:api] No optional translation secrets were provided. Translation fallback will keep original text where needed.",
+  );
+}
 
 console.log(`[deploy:api] YOUTUBE_API_KEY secret 동기화 완료. (source: ${youtubeSecret.source})`);
 console.log(

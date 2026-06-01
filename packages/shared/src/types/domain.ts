@@ -3,6 +3,7 @@ import type { CategorySlug } from "../constants/categories";
 export type SortOrder = "popular" | "latest";
 export type CategoryFilter = CategorySlug | "all";
 export type ContentStatus = "active" | "hidden";
+export type TranslationSource = "manual" | "youtube_localized" | "machine" | "original";
 
 export interface Category {
   id: number;
@@ -35,7 +36,13 @@ export interface ReactionVideo {
   id: number;
   youtubeVideoId: string;
   title: string;
+  titleOriginal: string;
+  titleTranslationSource: TranslationSource;
+  hasTitleTranslation: boolean;
   description: string | null;
+  descriptionOriginal: string | null;
+  descriptionTranslationSource: TranslationSource | null;
+  hasDescriptionTranslation: boolean;
   thumbnailUrl: string | null;
   publishedAt: string;
   viewCount: number;
@@ -51,6 +58,9 @@ export interface ReactionCommentReply {
   authorDisplayName: string;
   authorProfileImageUrl: string | null;
   text: string;
+  originalText: string;
+  translationSource: TranslationSource;
+  hasTranslation: boolean;
   likeCount: number;
   publishedAt: string;
 }
@@ -60,6 +70,9 @@ export interface ReactionComment {
   authorDisplayName: string;
   authorProfileImageUrl: string | null;
   text: string;
+  originalText: string;
+  translationSource: TranslationSource;
+  hasTranslation: boolean;
   likeCount: number;
   publishedAt: string;
   updatedAt: string;
@@ -68,15 +81,27 @@ export interface ReactionComment {
 }
 
 export interface ReactionCommentsPayload {
+  locale: "ko";
   videoId: string;
   status: "ok" | "empty" | "disabled" | "unavailable";
   items: ReactionComment[];
   order: "relevance" | "time";
-  strategy: "top50" | "full";
+  strategy: "topN" | "full";
   fetchedAll: boolean;
   pageSize: number;
   fetchedCount: number;
   totalCommentCount: number;
+  estimatedQuotaUnits: number;
+  message: string;
+}
+
+export interface ReactionCommentRepliesPayload {
+  locale: "ko";
+  videoId: string;
+  commentId: string;
+  status: "ok" | "empty" | "unavailable";
+  items: ReactionCommentReply[];
+  fetchedCount: number;
   estimatedQuotaUnits: number;
   message: string;
 }
@@ -197,6 +222,11 @@ export interface AdminReactionVideo {
   categoryNameKo: string;
   channelName: string;
   originalTitle: string;
+  localizedTitle: string | null;
+  localizedTitleSource: TranslationSource | null;
+  originalDescription: string | null;
+  localizedDescription: string | null;
+  localizedDescriptionSource: TranslationSource | null;
   adminTitle: string | null;
   adminDescription: string | null;
   displayTitle: string;

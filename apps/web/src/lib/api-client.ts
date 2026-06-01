@@ -2,6 +2,7 @@ import type {
   AdminDashboardPayload,
   Category,
   CategoryFilter,
+  ReactionCommentRepliesPayload,
   ContentDetailPayload,
   ContentStatus,
   ContentSummary,
@@ -102,9 +103,15 @@ export const apiClient = {
       })}`,
     ),
   getHome: () => request<HomePayload>("/api/home"),
-  getReactionComments: (youtubeVideoId: string) =>
+  getReactionComments: (youtubeVideoId: string, limit = 20) =>
     request<ReactionCommentsPayload>(
-      `/api/reactions/${encodeURIComponent(youtubeVideoId)}/comments`,
+      `/api/reactions/${encodeURIComponent(youtubeVideoId)}/comments?${buildQuery({
+        limit,
+      })}`,
+    ),
+  getReactionCommentReplies: (youtubeVideoId: string, commentId: string) =>
+    request<ReactionCommentRepliesPayload>(
+      `/api/reactions/${encodeURIComponent(youtubeVideoId)}/comments/${encodeURIComponent(commentId)}/replies`,
     ),
   getReactions: (slug: string, sort: SortOrder, page = 1, limit = 12) =>
     request<ReactionListPayload>(

@@ -5,6 +5,7 @@ import type {
   Category,
   ContentStatus,
   HomeSiteCopy,
+  TranslationSource,
 } from "@awesomekorea/shared";
 
 import { parseJsonArray, toBoolean, toNullableString, toNumber, toStringValue } from "../lib/serializers";
@@ -55,6 +56,11 @@ interface AdminReactionRow {
   id: number;
   isFeatured: number;
   likeCount: number;
+  localizedDescription: string | null;
+  localizedDescriptionSource: string | null;
+  localizedTitle: string | null;
+  localizedTitleSource: string | null;
+  originalDescription: string | null;
   originalTitle: string;
   publishedAt: string;
   thumbnailUrl: string | null;
@@ -62,6 +68,21 @@ interface AdminReactionRow {
   youtubeUrl: string;
   youtubeVideoId: string;
 }
+
+const toTranslationSource = (
+  value: unknown,
+): TranslationSource | null => {
+  if (
+    value === "manual" ||
+    value === "youtube_localized" ||
+    value === "machine" ||
+    value === "original"
+  ) {
+    return value;
+  }
+
+  return null;
+};
 
 const mapCategory = (row: AdminCategoryRow): Category => ({
   id: toNumber(row.id),
@@ -99,6 +120,11 @@ const mapAdminReaction = (row: AdminReactionRow): AdminReactionVideo => ({
   categoryNameKo: toStringValue(row.categoryNameKo),
   channelName: toStringValue(row.channelName),
   originalTitle: toStringValue(row.originalTitle),
+  localizedTitle: toNullableString(row.localizedTitle),
+  localizedTitleSource: toTranslationSource(row.localizedTitleSource),
+  originalDescription: toNullableString(row.originalDescription),
+  localizedDescription: toNullableString(row.localizedDescription),
+  localizedDescriptionSource: toTranslationSource(row.localizedDescriptionSource),
   adminTitle: toNullableString(row.adminTitle),
   adminDescription: toNullableString(row.adminDescription),
   displayTitle: toStringValue(row.displayTitle),
@@ -361,9 +387,14 @@ export const getAdminReactions = async (
           cat.name_ko AS categoryNameKo,
           ch.title AS channelName,
           rv.title AS originalTitle,
+          rv.description AS originalDescription,
+          rv.localized_title AS localizedTitle,
+          rv.localized_title_source AS localizedTitleSource,
+          rv.localized_description AS localizedDescription,
+          rv.localized_description_source AS localizedDescriptionSource,
           rv.admin_title AS adminTitle,
           rv.admin_description AS adminDescription,
-          COALESCE(rv.admin_title, rv.title) AS displayTitle,
+          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
           rv.thumbnail_url AS thumbnailUrl,
           rv.published_at AS publishedAt,
           rv.view_count AS viewCount,

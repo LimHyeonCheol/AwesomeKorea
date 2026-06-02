@@ -213,6 +213,17 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+.hero-banner__panel-copy,
+.hero-banner__feature {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.hero-banner__panel-copy .hero-banner__description {
+  margin-top: 0;
+}
+
 .hero-banner__eyebrow {
   margin: 0;
   font-size: 0.82rem;
@@ -220,6 +231,29 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.78);
+}
+
+.hero-banner__feature-label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero-banner__feature-title {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.hero-banner__feature-overview {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.75;
 }
 
 .hero-banner__message {

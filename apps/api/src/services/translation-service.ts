@@ -38,7 +38,9 @@ const DEEPL_TRANSLATE_URL = "https://api-free.deepl.com/v2/translate";
 const GOOGLE_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2";
 const PAPAGO_TRANSLATE_URL = "https://openapi.naver.com/v1/papago/n2mt";
 const GLOSSARY_TOKEN_PREFIX = "__AK_GLOSSARY_";
-const KOREAN_CHARACTER_PATTERN = /[가-힣]/;
+const HANGUL_CHARACTER_PATTERN = /[\u3131-\u318E\uAC00-\uD7A3]/;
+const HANGUL_CHARACTER_GLOBAL_PATTERN = /[\u3131-\u318E\uAC00-\uD7A3]/g;
+const LATIN_CHARACTER_GLOBAL_PATTERN = /[A-Za-z]/g;
 
 const STATIC_TRANSLATION_GLOSSARY: TranslationGlossaryEntry[] = [
   {
@@ -53,9 +55,26 @@ const STATIC_TRANSLATION_GLOSSARY: TranslationGlossaryEntry[] = [
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const containsKoreanCharacters = (value: string) => KOREAN_CHARACTER_PATTERN.test(value);
-
 const normalizeText = (value: string | null | undefined) => value?.trim() ?? "";
+
+const countPatternMatches = (value: string, pattern: RegExp) => value.match(pattern)?.length ?? 0;
+
+const isPredominantlyKorean = (value: string) => {
+  const hangulCount = countPatternMatches(value, HANGUL_CHARACTER_GLOBAL_PATTERN);
+
+  if (hangulCount === 0) {
+    return false;
+  }
+
+  const latinCount = countPatternMatches(value, LATIN_CHARACTER_GLOBAL_PATTERN);
+
+  if (latinCount === 0) {
+    return HANGUL_CHARACTER_PATTERN.test(value);
+  }
+
+  // Mixed-language copy still benefits from translation when English is dominant.
+  return hangulCount >= latinCount * 2;
+};
 
 const buildProviderOrder = (env: TranslationEnv): ProviderName[] => {
   const requestedProvider = env.TRANSLATION_PROVIDER?.trim().toLowerCase();
@@ -479,7 +498,7 @@ export const shouldSkipKoreanTranslation = (
     return true;
   }
 
-  return containsKoreanCharacters(normalized);
+  return isPredominantlyKorean(normalized);
 };
 
 export const translateTextToKorean = async (

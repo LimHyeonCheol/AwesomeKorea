@@ -95,6 +95,9 @@ export function HeroBanner({
   }, [moveSlide, slides.length]);
 
   const activeSlide = slides[activeIndex] ?? null;
+  const hasDistinctSlideMessage = Boolean(
+    activeSlide?.message.trim().length && activeSlide.message.trim() !== activeSlide.overview.trim(),
+  );
 
   if (!activeSlide) {
     return (
@@ -203,12 +206,22 @@ export function HeroBanner({
         </div>
 
         <div className="hero-banner__panel">
-          <p className="hero-banner__eyebrow">
-            {activeSlide.categoryNameKo} · {activeSlide.contentTitle}
-          </p>
-          <h1 className="hero-banner__title">{activeSlide.primaryReaction.title}</h1>
-          <p className="hero-banner__description">{activeSlide.overview}</p>
-          <p className="hero-banner__message">{activeSlide.message}</p>
+          <div className="hero-banner__panel-copy">
+            <p className="hero-banner__eyebrow">
+              {activeSlide.categoryNameKo} · {activeSlide.contentTitle}
+            </p>
+            <h1 className="hero-banner__title">{siteCopy.heroTitle}</h1>
+            <p className="hero-banner__description">{siteCopy.heroDescription}</p>
+          </div>
+
+          <div className="hero-banner__feature">
+            <p className="hero-banner__feature-label">현재 추천 반응</p>
+            <p className="hero-banner__feature-title">{activeSlide.primaryReaction.title}</p>
+            <p className="hero-banner__feature-overview">{activeSlide.overview}</p>
+            {hasDistinctSlideMessage ? (
+              <p className="hero-banner__message">{activeSlide.message}</p>
+            ) : null}
+          </div>
 
           <div className="hero-banner__stats">
             <span className="hero-banner__meta-badge">

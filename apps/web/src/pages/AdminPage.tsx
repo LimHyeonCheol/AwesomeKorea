@@ -18,17 +18,18 @@ import { formatCompactNumber, formatKoreanDate } from "../lib/formatters";
 const ADMIN_TOKEN_STORAGE_KEY = "awesomekorea.admin.token";
 
 const DEFAULT_SETTINGS: HomeSiteCopy = {
-  brandName: "어썸코리아",
+  brandName: "AwesomeKorea",
   brandTagline: "Awesome Korea - 해외 반응 모음",
-  heroBadge: "관리자 추천",
-  heroToolbarCopy: "운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 살펴보세요.",
-  heroTitle: "지금 소개할 대표 반응을 운영자가 직접 편성합니다.",
+  heroBadge: "운영자 추천",
+  heroToolbarCopy: "운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 확인해보세요.",
+  heroTitle: "지금 공개된 대표 반응을 운영자가 직접 큐레이션합니다.",
   heroDescription:
-    "대문 문구, 카테고리, 유튜브 제목과 소개글, 메인 대표 반응까지 모두 관리자에서 조정할 수 있습니다.",
+    "메인 문구, 카테고리, 콘텐츠와 메인 추천 유튜브 반응을 한 화면에서 직접 관리합니다.",
 };
 
 interface EditableContent extends AdminContent {
   aliasesText: string;
+  searchKeywordsText: string;
 }
 
 interface NewCategoryDraft {
@@ -42,7 +43,11 @@ interface NewContentDraft {
   aliasesText: string;
   categoryId: number;
   description: string;
+  heroMessageKo: string;
+  priorityScore: string;
+  releaseDate: string;
   releaseYear: string;
+  searchKeywordsText: string;
   slug: string;
   status: ContentStatus;
   thumbnailUrl: string;
@@ -64,14 +69,19 @@ const createNewContentDraft = (categories: Category[]): NewContentDraft => ({
   titleEn: "",
   aliasesText: "",
   releaseYear: "",
+  releaseDate: "",
   thumbnailUrl: "",
   description: "",
+  searchKeywordsText: "",
+  priorityScore: "0",
+  heroMessageKo: "",
   status: "active",
 });
 
 const toEditableContent = (content: AdminContent): EditableContent => ({
   ...content,
   aliasesText: content.aliases.join(", "),
+  searchKeywordsText: content.searchKeywords.join(", "),
 });
 
 const parseAliases = (value: string) =>
@@ -83,6 +93,26 @@ const parseAliases = (value: string) =>
 const normalizeOptionalText = (value: string) => {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const parseOptionalInteger = (value: string) => {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  return Number(trimmed);
+};
+
+const parsePriorityScore = (value: string) => {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    return 0;
+  }
+
+  return Number(trimmed);
 };
 
 interface AdminPageProps {
@@ -131,6 +161,10 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
     setNewContentDraft(createNewContentDraft(dashboardResource.data.categories));
   }, [dashboardResource.data]);
 
+  const refreshDashboard = async () => {
+    await dashboardResource.refetch();
+  };
+
   const runWithSaving = async (key: string, action: () => Promise<void>) => {
     setSavingKey(key);
     setActionError(null);
@@ -138,14 +172,10 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
     try {
       await action();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "저장 중 오류가 발생했습니다.");
+      setActionError(error instanceof Error ? error.message : "작업 중 오류가 발생했습니다.");
     } finally {
       setSavingKey(null);
     }
-  };
-
-  const refreshDashboard = async () => {
-    await dashboardResource.refetch();
   };
 
   const handlePersistToken = () => {
@@ -163,7 +193,11 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
     setRefreshKey((current) => current + 1);
   };
 
-  const handleCategoryChange = <K extends keyof Category>(categoryId: number, field: K, value: Category[K]) => {
+  const handleCategoryChange = <K extends keyof Category>(
+    categoryId: number,
+    field: K,
+    value: Category[K],
+  ) => {
     setCategoryDrafts((current) =>
       current.map((category) =>
         category.id === categoryId
@@ -221,7 +255,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
             <p className="admin-header__eyebrow">AwesomeKorea Admin</p>
             <h1 className="admin-header__title">운영 관리</h1>
             <p className="admin-header__copy">
-              대문 문구, 카테고리, 콘텐츠, 메인 대표 유튜브 반응을 이 화면에서 직접 관리합니다.
+              메인 문구, 카테고리, 콘텐츠, 메인 추천 유튜브 반응을 한 화면에서 직접 관리합니다.
             </p>
           </div>
 
@@ -229,7 +263,11 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
             <button className="chip-button chip-button--ghost" type="button" onClick={onNavigateHome}>
               메인으로 이동
             </button>
-            <button className="chip-button chip-button--solid" type="button" onClick={() => void refreshDashboard()}>
+            <button
+              className="chip-button chip-button--solid"
+              type="button"
+              onClick={() => void refreshDashboard()}
+            >
               새로고침
             </button>
           </div>
@@ -242,7 +280,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
             <SectionHeader
               eyebrow="Admin Token"
               title="관리자 토큰"
-              description="운영 환경에서는 INTERNAL_API_TOKEN 값을 입력한 뒤 저장하면 수정 API를 사용할 수 있습니다. 로컬에서 토큰이 비어 있으면 그대로 동작합니다."
+              description="운영 환경의 INTERNAL_API_TOKEN 값을 입력하면 관리자 API를 호출할 수 있습니다. 로컬 개발에서는 비워 둔 상태로도 동작할 수 있습니다."
             />
 
             <div className="admin-token-panel__form">
@@ -250,7 +288,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                 className="admin-input"
                 type="password"
                 value={tokenInput}
-                placeholder="Bearer 토큰을 입력하거나 로컬에서는 비워 두세요."
+                placeholder="Bearer 토큰을 입력하거나 로컬 환경에서는 비워 두세요."
                 onChange={(event) => setTokenInput(event.target.value)}
               />
               <button className="chip-button chip-button--solid" type="button" onClick={handlePersistToken}>
@@ -261,7 +299,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
 
           {dashboardResource.error ? (
             <StatusNotice
-              title="관리자 데이터를 불러오지 못했습니다"
+              title="관리자 데이터를 불러오지 못했습니다."
               description={dashboardResource.error}
               tone="danger"
               actionLabel="다시 시도"
@@ -271,7 +309,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
 
           {actionError ? (
             <StatusNotice
-              title="저장 작업이 완료되지 않았습니다"
+              title="작업을 완료하지 못했습니다."
               description={actionError}
               tone="danger"
             />
@@ -279,7 +317,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
 
           {dashboardResource.isLoading && !dashboardResource.data ? (
             <StatusNotice
-              title="관리자 데이터를 불러오는 중"
+              title="관리자 데이터를 불러오는 중입니다."
               description="카테고리, 콘텐츠, 대표 리액션 설정을 정리하고 있습니다."
             />
           ) : null}
@@ -289,16 +327,14 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
               <section className="panel-section admin-summary">
                 <div className="admin-summary__card">
                   <span className="admin-summary__label">활성 카테고리</span>
-                  <strong className="admin-summary__value">
-                    {categoryOptions.length}개
-                  </strong>
+                  <strong className="admin-summary__value">{categoryOptions.length}개</strong>
                 </div>
                 <div className="admin-summary__card">
                   <span className="admin-summary__label">등록 콘텐츠</span>
                   <strong className="admin-summary__value">{contentDrafts.length}개</strong>
                 </div>
                 <div className="admin-summary__card">
-                  <span className="admin-summary__label">메인 대표 리액션</span>
+                  <span className="admin-summary__label">메인 추천 리액션</span>
                   <strong className="admin-summary__value">{featuredReactionCount}개</strong>
                 </div>
               </section>
@@ -306,8 +342,8 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
               <section className="panel-section">
                 <SectionHeader
                   eyebrow="Home Copy"
-                  title="대문 문구 설정"
-                  description="브랜드명, 태그라인, 히어로 배지, 대문 문구를 수정하면 메인 상단에 바로 반영됩니다."
+                  title="메인 문구 설정"
+                  description="브랜드명, 태그라인, 히어로 배지와 메인 문구를 수정하면 메인 상단에 바로 반영됩니다."
                 />
 
                 <div className="admin-form-grid">
@@ -365,7 +401,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                     />
                   </label>
                   <label className="admin-field admin-field--full">
-                    <span className="admin-field__label">대문 제목</span>
+                    <span className="admin-field__label">메인 제목</span>
                     <textarea
                       className="admin-textarea"
                       rows={2}
@@ -379,7 +415,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                     />
                   </label>
                   <label className="admin-field admin-field--full">
-                    <span className="admin-field__label">대문 설명</span>
+                    <span className="admin-field__label">메인 설명</span>
                     <textarea
                       className="admin-textarea"
                       rows={3}
@@ -406,7 +442,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       })
                     }
                   >
-                    대문 문구 저장
+                    메인 문구 저장
                   </button>
                 </div>
               </section>
@@ -415,7 +451,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                 <SectionHeader
                   eyebrow="Categories"
                   title="카테고리 관리"
-                  description="카테고리는 DB에서 읽고 쓰며, 활성 여부와 정렬 순서를 관리자에서 제어합니다."
+                  description="카테고리의 노출 여부와 정렬 순서를 여기서 관리합니다."
                 />
 
                 <div className="admin-card-list">
@@ -428,7 +464,11 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                             className="admin-input"
                             value={category.slug}
                             onChange={(event) =>
-                              handleCategoryChange(category.id, "slug", event.target.value)
+                              handleCategoryChange(
+                                category.id,
+                                "slug",
+                                event.target.value as Category["slug"],
+                              )
                             }
                           />
                         </label>
@@ -449,11 +489,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                             type="number"
                             value={category.sortOrder}
                             onChange={(event) =>
-                              handleCategoryChange(
-                                category.id,
-                                "sortOrder",
-                                Number(event.target.value),
-                              )
+                              handleCategoryChange(category.id, "sortOrder", Number(event.target.value))
                             }
                           />
                         </label>
@@ -468,6 +504,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           <span>활성</span>
                         </label>
                       </div>
+
                       <div className="admin-section__actions">
                         <button
                           className="chip-button chip-button--solid"
@@ -549,6 +586,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       <span>활성</span>
                     </label>
                   </div>
+
                   <div className="admin-section__actions">
                     <button
                       className="chip-button chip-button--solid"
@@ -572,7 +610,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                 <SectionHeader
                   eyebrow="Contents"
                   title="콘텐츠 관리"
-                  description="콘텐츠 카드에 노출될 기본 메타데이터를 등록하고 수정합니다. 이후 수집과 카테고리별 목록이 이 데이터를 기준으로 동작합니다."
+                  description="콘텐츠 메타데이터, 우선순위, 검색 키워드와 히어로 문구를 등록하고 수정합니다."
                 />
 
                 <div className="admin-card-list">
@@ -606,7 +644,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           />
                         </label>
                         <label className="admin-field">
-                          <span className="admin-field__label">한글 제목</span>
+                          <span className="admin-field__label">국문 제목</span>
                           <input
                             className="admin-input"
                             value={content.titleKo}
@@ -641,6 +679,29 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           />
                         </label>
                         <label className="admin-field">
+                          <span className="admin-field__label">출시 예정일</span>
+                          <input
+                            className="admin-input"
+                            value={content.releaseDate ?? ""}
+                            placeholder="2026-10"
+                            onChange={(event) =>
+                              handleContentChange(content.id, "releaseDate", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label className="admin-field">
+                          <span className="admin-field__label">우선순위</span>
+                          <input
+                            className="admin-input"
+                            type="number"
+                            min={0}
+                            value={content.priorityScore}
+                            onChange={(event) =>
+                              handleContentChange(content.id, "priorityScore", Number(event.target.value))
+                            }
+                          />
+                        </label>
+                        <label className="admin-field">
                           <span className="admin-field__label">상태</span>
                           <select
                             className="admin-select"
@@ -654,12 +715,22 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           </select>
                         </label>
                         <label className="admin-field admin-field--full">
-                          <span className="admin-field__label">별칭 / 검색어</span>
+                          <span className="admin-field__label">별칭</span>
                           <input
                             className="admin-input"
                             value={content.aliasesText}
                             onChange={(event) =>
                               handleContentChange(content.id, "aliasesText", event.target.value)
+                            }
+                          />
+                        </label>
+                        <label className="admin-field admin-field--full">
+                          <span className="admin-field__label">검색 키워드</span>
+                          <input
+                            className="admin-input"
+                            value={content.searchKeywordsText}
+                            onChange={(event) =>
+                              handleContentChange(content.id, "searchKeywordsText", event.target.value)
                             }
                           />
                         </label>
@@ -684,13 +755,27 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                             }
                           />
                         </label>
+                        <label className="admin-field admin-field--full">
+                          <span className="admin-field__label">히어로 문구</span>
+                          <textarea
+                            className="admin-textarea"
+                            rows={2}
+                            value={content.heroMessageKo ?? ""}
+                            onChange={(event) =>
+                              handleContentChange(content.id, "heroMessageKo", event.target.value)
+                            }
+                          />
+                        </label>
                       </div>
 
                       <div className="admin-card__meta">
                         <span>리액션 {content.reactionCount}개</span>
                         <span>누적 {formatCompactNumber(content.totalViews)}</span>
                         <span>
-                          최신 {content.latestReactionAt ? formatKoreanDate(content.latestReactionAt) : "없음"}
+                          최신{" "}
+                          {content.latestReactionAt
+                            ? formatKoreanDate(content.latestReactionAt)
+                            : "없음"}
                         </span>
                       </div>
 
@@ -708,8 +793,12 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                                 titleEn: normalizeOptionalText(content.titleEn ?? ""),
                                 aliases: parseAliases(content.aliasesText),
                                 releaseYear: content.releaseYear,
+                                releaseDate: normalizeOptionalText(content.releaseDate ?? ""),
                                 thumbnailUrl: normalizeOptionalText(content.thumbnailUrl ?? ""),
                                 description: normalizeOptionalText(content.description ?? ""),
+                                searchKeywords: parseAliases(content.searchKeywordsText),
+                                priorityScore: content.priorityScore,
+                                heroMessageKo: normalizeOptionalText(content.heroMessageKo ?? ""),
                                 status: content.status,
                               });
                               await refreshDashboard();
@@ -759,7 +848,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       />
                     </label>
                     <label className="admin-field">
-                      <span className="admin-field__label">한글 제목</span>
+                      <span className="admin-field__label">국문 제목</span>
                       <input
                         className="admin-input"
                         value={newContentDraft.titleKo}
@@ -799,6 +888,35 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       />
                     </label>
                     <label className="admin-field">
+                      <span className="admin-field__label">출시 예정일</span>
+                      <input
+                        className="admin-input"
+                        value={newContentDraft.releaseDate}
+                        placeholder="2026-10"
+                        onChange={(event) =>
+                          setNewContentDraft((current) => ({
+                            ...current,
+                            releaseDate: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin-field">
+                      <span className="admin-field__label">우선순위</span>
+                      <input
+                        className="admin-input"
+                        type="number"
+                        min={0}
+                        value={newContentDraft.priorityScore}
+                        onChange={(event) =>
+                          setNewContentDraft((current) => ({
+                            ...current,
+                            priorityScore: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin-field">
                       <span className="admin-field__label">상태</span>
                       <select
                         className="admin-select"
@@ -815,7 +933,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                       </select>
                     </label>
                     <label className="admin-field admin-field--full">
-                      <span className="admin-field__label">별칭 / 검색어</span>
+                      <span className="admin-field__label">별칭</span>
                       <input
                         className="admin-input"
                         value={newContentDraft.aliasesText}
@@ -823,6 +941,19 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                           setNewContentDraft((current) => ({
                             ...current,
                             aliasesText: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="admin-field admin-field--full">
+                      <span className="admin-field__label">검색 키워드</span>
+                      <input
+                        className="admin-input"
+                        value={newContentDraft.searchKeywordsText}
+                        onChange={(event) =>
+                          setNewContentDraft((current) => ({
+                            ...current,
+                            searchKeywordsText: event.target.value,
                           }))
                         }
                       />
@@ -854,6 +985,20 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                         }
                       />
                     </label>
+                    <label className="admin-field admin-field--full">
+                      <span className="admin-field__label">히어로 문구</span>
+                      <textarea
+                        className="admin-textarea"
+                        rows={2}
+                        value={newContentDraft.heroMessageKo}
+                        onChange={(event) =>
+                          setNewContentDraft((current) => ({
+                            ...current,
+                            heroMessageKo: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
                   </div>
 
                   <div className="admin-section__actions">
@@ -869,12 +1014,13 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                             titleKo: newContentDraft.titleKo,
                             titleEn: normalizeOptionalText(newContentDraft.titleEn),
                             aliases: parseAliases(newContentDraft.aliasesText),
-                            releaseYear:
-                              newContentDraft.releaseYear.trim().length > 0
-                                ? Number(newContentDraft.releaseYear)
-                                : null,
+                            releaseYear: parseOptionalInteger(newContentDraft.releaseYear),
+                            releaseDate: normalizeOptionalText(newContentDraft.releaseDate),
                             thumbnailUrl: normalizeOptionalText(newContentDraft.thumbnailUrl),
                             description: normalizeOptionalText(newContentDraft.description),
+                            searchKeywords: parseAliases(newContentDraft.searchKeywordsText),
+                            priorityScore: parsePriorityScore(newContentDraft.priorityScore),
+                            heroMessageKo: normalizeOptionalText(newContentDraft.heroMessageKo),
                             status: newContentDraft.status,
                           });
                           setNewContentDraft(createNewContentDraft(categoryOptions));
@@ -891,8 +1037,8 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
               <section className="panel-section">
                 <SectionHeader
                   eyebrow="Featured Reactions"
-                  title="메인 대표 유튜브 반응"
-                  description="현재 소개되는 유튜브 반응을 관리자에서 직접 선정합니다. 제목과 소개글을 함께 수정하고 메인 노출 순서를 지정할 수 있습니다."
+                  title="메인 추천 유튜브 반응"
+                  description="수집된 유튜브 반응의 노출 제목, 소개글, 메인 추천 여부와 노출 순서를 직접 조정합니다."
                 />
 
                 <div className="admin-card-list">
@@ -950,7 +1096,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                               handleReactionChange(reaction.id, "isFeatured", event.target.checked)
                             }
                           />
-                          <span>메인 대표 노출</span>
+                          <span>메인 추천 노출</span>
                         </label>
                         <label className="admin-field admin-field--compact">
                           <span className="admin-field__label">노출 순서</span>
@@ -986,9 +1132,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
                             void runWithSaving(`reaction-${reaction.id}`, async () => {
                               await apiClient.updateAdminReaction(savedToken, reaction.youtubeVideoId, {
                                 adminTitle: normalizeOptionalText(reaction.adminTitle ?? ""),
-                                adminDescription: normalizeOptionalText(
-                                  reaction.adminDescription ?? "",
-                                ),
+                                adminDescription: normalizeOptionalText(reaction.adminDescription ?? ""),
                                 isFeatured: reaction.isFeatured,
                                 featuredOrder: reaction.featuredOrder,
                               });

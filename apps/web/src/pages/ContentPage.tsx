@@ -9,7 +9,7 @@ import { StatusNotice } from "../components/common/StatusNotice";
 import { ReactionListItem } from "../components/content/ReactionListItem";
 import { useAsyncResource } from "../hooks/useAsyncResource";
 import { apiClient } from "../lib/api-client";
-import { formatCompactNumber } from "../lib/formatters";
+import { formatCompactNumber, formatReleaseDateLabel } from "../lib/formatters";
 
 interface ContentPageProps {
   contentSlug: string;
@@ -20,13 +20,9 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
   const [selectedSort, setSelectedSort] = useState<SortOrder>("popular");
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
 
-  const detailResource = useAsyncResource(
-    () => apiClient.getContentDetail(contentSlug),
-    [contentSlug],
-    {
-      initialData: null,
-    },
-  );
+  const detailResource = useAsyncResource(() => apiClient.getContentDetail(contentSlug), [contentSlug], {
+    initialData: null,
+  });
 
   const reactionResource = useAsyncResource(
     () => apiClient.getReactions(contentSlug, selectedSort, 1, 12),
@@ -83,13 +79,13 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
             {detailResource.isLoading && !detailResource.data ? (
               <StatusNotice
                 title="상세 정보를 불러오는 중"
-                description="선택한 콘텐츠의 메타 데이터와 대표 반응 목록을 정리하고 있습니다."
+                description="선택한 콘텐츠의 메타데이터와 대표 리액션 목록을 정리하고 있습니다."
               />
             ) : null}
 
             {detailResource.error ? (
               <StatusNotice
-                title="상세 정보를 불러오지 못했습니다"
+                title="상세 정보를 불러오지 못했습니다."
                 description={detailResource.error}
                 tone="danger"
                 actionLabel="다시 시도"
@@ -105,7 +101,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                     title={detailResource.data.content.titleKo}
                     description={
                       detailResource.data.content.description ??
-                      "관련 리액션 행을 누르면 바로 아래에서 영상을 펼쳐 볼 수 있습니다."
+                      "대표 리액션을 열면 아래 목록과 함께 빠르게 비교할 수 있습니다."
                     }
                   />
                 </div>
@@ -115,21 +111,22 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                     <div className="detail-summary-card__meta">
                       <span className="detail-badge">{detailResource.data.content.categoryNameKo}</span>
                       <span>
-                        {detailResource.data.content.releaseYear ?? "미정"} · 리액션{" "}
-                        {detailResource.data.content.reactionCount}개
+                        {formatReleaseDateLabel(
+                          detailResource.data.content.releaseDate,
+                          detailResource.data.content.releaseYear,
+                        )}{" "}
+                        · 리액션 {detailResource.data.content.reactionCount}개
                       </span>
-                      <span>
-                        누적 조회수 {formatCompactNumber(detailResource.data.content.totalViews)}
-                      </span>
+                      <span>누적 조회수 {formatCompactNumber(detailResource.data.content.totalViews)}</span>
                     </div>
 
                     <p className="detail-summary-card__description">
-                      {detailResource.data.content.description ??
-                        "해외 채널들이 어떤 포인트에서 반응하는지, 대표 리액션 행을 펼치며 바로 비교할 수 있습니다."}
+                      {detailResource.data.content.heroMessageKo ??
+                        detailResource.data.content.description ??
+                        "해외 채널들이 어떤 포인트에 반응하는지 대표 리액션으로 먼저 살펴볼 수 있습니다."}
                     </p>
                     <p className="detail-summary-card__hint">
-                      관련 리액션 한 칸 전체를 누르거나 제목 영역, 재생 버튼 위치를 눌러도 같은 방식으로
-                      영상이 펼쳐집니다.
+                      리스트에서 원하는 영상을 열면 같은 페이지 안에서 바로 비교할 수 있습니다.
                     </p>
                   </div>
 
@@ -138,7 +135,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                       <SectionHeader
                         eyebrow="Reaction Feed"
                         title="관련 리액션"
-                        description="상단 고정 플레이어 대신, 선택한 행 바로 아래에서 영상을 펼쳐서 비교합니다."
+                        description="인기순과 최신순을 오가며 대표 반응과 신규 반응을 함께 비교해보세요."
                       />
                       <div className="sort-toggle" role="tablist" aria-label="리액션 정렬">
                         <button
@@ -165,13 +162,13 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                     {reactionResource.isLoading && !reactionResource.data ? (
                       <StatusNotice
                         title="리액션 목록을 불러오는 중"
-                        description="정렬 조건에 맞는 반응 영상을 다시 정리하고 있습니다."
+                        description="정렬 기준에 맞는 반응 영상을 다시 정리하고 있습니다."
                       />
                     ) : null}
 
                     {reactionResource.error ? (
                       <StatusNotice
-                        title="리액션 목록을 불러오지 못했습니다"
+                        title="리액션 목록을 불러오지 못했습니다."
                         description={reactionResource.error}
                         tone="danger"
                         actionLabel="다시 시도"
@@ -181,7 +178,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
 
                     {reactionResource.data && reactionResource.data.items.length === 0 ? (
                       <StatusNotice
-                        title="표시할 리액션이 없습니다"
+                        title="표시할 리액션이 없습니다."
                         description="조건에 맞는 해외 리액션 영상이 아직 수집되지 않았습니다."
                       />
                     ) : null}
@@ -194,9 +191,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
                           reaction={reaction}
                           onToggle={() =>
                             setActiveVideoId((currentVideoId) =>
-                              currentVideoId === reaction.youtubeVideoId
-                                ? null
-                                : reaction.youtubeVideoId,
+                              currentVideoId === reaction.youtubeVideoId ? null : reaction.youtubeVideoId,
                             )
                           }
                         />
@@ -212,9 +207,7 @@ export function ContentPage({ contentSlug, onNavigateHome }: ContentPageProps) {
 
       <AppFooter
         updatedAt={
-          detailResource.data?.content.latestReactionAt ??
-          reactionResource.data?.items[0]?.publishedAt ??
-          null
+          detailResource.data?.content.latestReactionAt ?? reactionResource.data?.items[0]?.publishedAt ?? null
         }
       />
     </div>

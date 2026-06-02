@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Category,
   ContentDetail,
   ContentSummary,
@@ -34,8 +34,12 @@ interface ContentSummaryRow {
   categoryNameKo: string;
   categorySlug: CategorySlug;
   description: string | null;
+  heroMessageKo: string | null;
   id: number;
+  isEditorialPick: number;
   latestReactionAt: string | null;
+  priorityScore: number;
+  releaseDate: string | null;
   reactionCount: number;
   releaseYear: number | null;
   slug: string;
@@ -47,6 +51,14 @@ interface ContentSummaryRow {
 
 interface ContentDetailRow extends ContentSummaryRow {
   aliasesJson: string | null;
+  searchKeywordsJson: string | null;
+}
+
+interface EditorialContentRow extends ContentSummaryRow {
+  body: string | null;
+  headline: string | null;
+  slotCode: string;
+  sortOrder: number;
 }
 
 interface RankingRow {
@@ -101,6 +113,8 @@ export interface SyncContent {
   categoryNameKo: string;
   categorySlug: CategorySlug;
   id: number;
+  priorityScore: number;
+  searchKeywords: string[];
   slug: string;
   titleEn: string | null;
   titleKo: string;
@@ -187,8 +201,12 @@ const mapContentSummary = (row: ContentSummaryRow): ContentSummary => ({
   categoryNameKo:
     toNullableString(row.categoryNameKo) ?? CATEGORY_NAME_BY_SLUG[row.categorySlug] ?? row.categorySlug,
   releaseYear: row.releaseYear === null ? null : toNumber(row.releaseYear),
+  releaseDate: toNullableString(row.releaseDate),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   description: toNullableString(row.description),
+  heroMessageKo: toNullableString(row.heroMessageKo),
+  priorityScore: toNumber(row.priorityScore),
+  isEditorialPick: toBoolean(row.isEditorialPick),
   reactionCount: toNumber(row.reactionCount),
   totalViews: toNumber(row.totalViews),
   latestReactionAt: toNullableString(row.latestReactionAt),
@@ -231,6 +249,136 @@ const mapReactionVideo = (row: ReactionVideoRow): ReactionVideo => ({
   channelName: toStringValue(row.channelName),
 });
 
+const buildEditorialPickExpression = (contentAlias: string) => `
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM editorial_entries ee
+      JOIN editorial_slots es
+        ON es.id = ee.slot_id
+      WHERE ee.target_type = 'content'
+        AND ee.target_ref = ${contentAlias}.slug
+        AND ee.is_active = 1
+        AND es.is_active = 1
+    ) THEN 1
+    ELSE 0
+  END
+`;
+
+const getEditorialContentEntries = async (
+  db: D1Database,
+  slotCode: string,
+): Promise<
+  Array<{
+    body: string | null;
+    content: ContentSummary;
+    headline: string;
+    slotCode: string;
+    sortOrder: number;
+  }>
+> => {
+  const result = await db
+    .prepare(
+      `
+        SELECT
+          es.slot_code AS slotCode,
+          ee.sort_order AS sortOrder,
+          ee.headline_override_ko AS headline,
+          ee.body_override_ko AS body,
+          c.id AS id,
+          c.slug AS slug,
+          c.title_ko AS titleKo,
+          c.title_en AS titleEn,
+          cat.slug AS categorySlug,
+          cat.name_ko AS categoryNameKo,
+          c.release_year AS releaseYear,
+          c.release_date AS releaseDate,
+          c.thumbnail_url AS thumbnailUrl,
+          c.description AS description,
+          c.hero_message_ko AS heroMessageKo,
+          c.priority_score AS priorityScore,
+          1 AS isEditorialPick,
+          COUNT(rv.id) AS reactionCount,
+          COALESCE(SUM(rv.view_count), 0) AS totalViews,
+          MAX(rv.published_at) AS latestReactionAt
+        FROM editorial_slots es
+        JOIN editorial_entries ee
+          ON ee.slot_id = es.id
+        JOIN contents c
+          ON c.slug = ee.target_ref
+        JOIN categories cat
+          ON cat.id = c.category_id
+        LEFT JOIN reaction_videos rv
+          ON rv.content_id = c.id
+          AND rv.is_overseas_reaction = 1
+          AND LENGTH(rv.youtube_video_id) = ${VALID_YOUTUBE_VIDEO_ID_LENGTH}
+        WHERE es.slot_code = ?
+          AND es.is_active = 1
+          AND ee.is_active = 1
+          AND c.status = 'active'
+          AND cat.is_active = 1
+        GROUP BY
+          es.slot_code,
+          ee.sort_order,
+          ee.headline_override_ko,
+          ee.body_override_ko,
+          c.id,
+          c.slug,
+          c.title_ko,
+          c.title_en,
+          cat.slug,
+          cat.name_ko,
+          c.release_year,
+          c.release_date,
+          c.thumbnail_url,
+          c.description,
+          c.hero_message_ko,
+          c.priority_score
+        ORDER BY ee.sort_order ASC, c.priority_score DESC, totalViews DESC, c.id ASC
+      `,
+    )
+    .bind(slotCode)
+    .all<EditorialContentRow>();
+
+  return (result.results ?? []).map((row) => ({
+    slotCode: toStringValue(row.slotCode),
+    sortOrder: toNumber(row.sortOrder),
+    headline: toNullableString(row.headline) ?? toStringValue(row.titleKo),
+    body: toNullableString(row.body),
+    content: mapContentSummary(row),
+  }));
+};
+
+const getEditorialHeroSlug = async (
+  db: D1Database,
+  slotCode: string,
+): Promise<string | null> => {
+  const row = await db
+    .prepare(
+      `
+        SELECT ee.target_ref AS slug
+        FROM editorial_slots es
+        JOIN editorial_entries ee
+          ON ee.slot_id = es.id
+        JOIN contents c
+          ON c.slug = ee.target_ref
+        JOIN categories cat
+          ON cat.id = c.category_id
+        WHERE es.slot_code = ?
+          AND es.is_active = 1
+          AND ee.is_active = 1
+          AND c.status = 'active'
+          AND cat.is_active = 1
+        ORDER BY ee.sort_order ASC, ee.id ASC
+        LIMIT 1
+      `,
+    )
+    .bind(slotCode)
+    .first<{ slug: string }>();
+
+  return toNullableString(row?.slug);
+};
+
 export const getCategories = async (db: D1Database): Promise<Category[]> => {
   const result = await db
     .prepare(
@@ -252,10 +400,20 @@ export const getCategories = async (db: D1Database): Promise<Category[]> => {
 };
 
 export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
-  const [siteCopy, featuredReactions, categories, topResult, popularResult] = await Promise.all([
+  const [
+    siteCopy,
+    featuredReactions,
+    categories,
+    homeHeroEntries,
+    featuredContentEntries,
+    topResult,
+    popularResult,
+  ] = await Promise.all([
     getHomeSiteCopy(db),
     getFeaturedHomeReactions(db),
     getCategories(db),
+    getEditorialContentEntries(db, "home.hero"),
+    getEditorialContentEntries(db, "home.featured.contents"),
     db
       .prepare(
         `
@@ -337,8 +495,12 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
             cat.slug AS categorySlug,
             cat.name_ko AS categoryNameKo,
             c.release_year AS releaseYear,
+            c.release_date AS releaseDate,
             c.thumbnail_url AS thumbnailUrl,
             c.description AS description,
+            c.hero_message_ko AS heroMessageKo,
+            c.priority_score AS priorityScore,
+            ${buildEditorialPickExpression("c")} AS isEditorialPick,
             COUNT(rv.id) AS reactionCount,
             COALESCE(SUM(rv.view_count), 0) AS totalViews,
             MAX(rv.published_at) AS latestReactionAt
@@ -359,9 +521,12 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
             cat.slug,
             cat.name_ko,
             c.release_year,
+            c.release_date,
             c.thumbnail_url,
-            c.description
-          ORDER BY totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC
+            c.description,
+            c.hero_message_ko,
+            c.priority_score
+          ORDER BY c.priority_score DESC, totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC
         `,
       )
       .all<ContentSummaryRow>(),
@@ -369,10 +534,11 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
 
   const top10 = (topResult.results ?? []).map(mapRankingItem);
   const popularItems = (popularResult.results ?? []).map(mapContentSummary);
+  const contentBySlug = new Map(popularItems.map((item) => [item.slug, item]));
   const sections: HomePayload["popularByCategory"] = [
     {
       categorySlug: "all",
-      categoryNameKo: "전체",
+      categoryNameKo: "?꾩껜",
       items: popularItems.slice(0, 8),
     },
   ];
@@ -385,27 +551,53 @@ export const getHomePayload = async (db: D1Database): Promise<HomePayload> => {
     });
   }
 
-  const hero = featuredReactions[0]
+  const heroEntry = homeHeroEntries[0] ?? null;
+  const fallbackHeroContent =
+    (featuredReactions[0] ? contentBySlug.get(featuredReactions[0].contentSlug) : null) ??
+    (top10[0] ? contentBySlug.get(top10[0].contentSlug) : null) ??
+    null;
+  const hero = heroEntry
     ? {
-        contentSlug: featuredReactions[0].contentSlug,
-        titleKo: featuredReactions[0].contentTitle,
-        categoryNameKo: featuredReactions[0].categoryNameKo,
-        reactionCount: featuredReactions[0].reactionCount,
-        message: "관리자가 고른 대표 반응",
+        contentSlug: heroEntry.content.slug,
+        titleKo: heroEntry.content.titleKo,
+        categoryNameKo: heroEntry.content.categoryNameKo,
+        reactionCount: heroEntry.content.reactionCount,
+        message:
+          heroEntry.content.heroMessageKo ??
+          heroEntry.body ??
+          heroEntry.headline ??
+          siteCopy.heroDescription,
+        releaseDate: heroEntry.content.releaseDate,
       }
-    : top10[0]
+    : featuredReactions[0]
       ? {
-          contentSlug: top10[0].contentSlug,
-          titleKo: top10[0].titleKo,
-          categoryNameKo: top10[0].categoryNameKo,
-          reactionCount: top10[0].reactionCount,
-          message: "오늘 가장 많이 본 반응 콘텐츠",
+          contentSlug: featuredReactions[0].contentSlug,
+          titleKo: featuredReactions[0].contentTitle,
+          categoryNameKo: featuredReactions[0].categoryNameKo,
+          reactionCount: featuredReactions[0].reactionCount,
+          message: fallbackHeroContent?.heroMessageKo ?? "관리자가 고른 대표 반응",
+          releaseDate: fallbackHeroContent?.releaseDate ?? null,
         }
-      : null;
+      : top10[0]
+        ? {
+            contentSlug: top10[0].contentSlug,
+            titleKo: top10[0].titleKo,
+            categoryNameKo: top10[0].categoryNameKo,
+            reactionCount: top10[0].reactionCount,
+            message: fallbackHeroContent?.heroMessageKo ?? "지금 가장 많이 보는 반응 콘텐츠",
+            releaseDate: fallbackHeroContent?.releaseDate ?? null,
+          }
+        : null;
 
   return {
     siteCopy,
     hero,
+    featuredContents: featuredContentEntries.map((entry) => ({
+      slotCode: entry.slotCode,
+      headline: entry.headline,
+      body: entry.body ?? entry.content.heroMessageKo,
+      content: entry.content,
+    })),
     featuredReactions,
     top10,
     popularByCategory: sections,
@@ -422,8 +614,8 @@ export const getContentList = async (
     sort: SortOrder;
   },
 ): Promise<PaginatedResponse<ContentSummary>> => {
-  const filters = ["c.status = 'active'"];
-  const countFilters = ["c.status = 'active'"];
+  const filters = ["c.status = 'active'", "cat.is_active = 1"];
+  const countFilters = ["c.status = 'active'", "cat.is_active = 1"];
   const bindings: unknown[] = [];
   const countBindings: unknown[] = [];
 
@@ -434,10 +626,17 @@ export const getContentList = async (
     countBindings.push(options.category);
   }
 
+  const categoryHeroSlug = options.category
+    ? await getEditorialHeroSlug(db, `category.${options.category}.hero`)
+    : null;
+  const orderBindings = categoryHeroSlug ? [categoryHeroSlug] : [];
+  const priorityOrderPrefix = categoryHeroSlug
+    ? "CASE WHEN c.slug = ? THEN 0 ELSE 1 END ASC, "
+    : "";
   const orderBy =
     options.sort === "latest"
-      ? "CASE WHEN latestReactionAt IS NULL THEN 1 ELSE 0 END ASC, latestReactionAt DESC, totalViews DESC, titleKo ASC"
-      : "totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC";
+      ? `${priorityOrderPrefix}c.priority_score DESC, CASE WHEN latestReactionAt IS NULL THEN 1 ELSE 0 END ASC, latestReactionAt DESC, totalViews DESC, titleKo ASC`
+      : `${priorityOrderPrefix}c.priority_score DESC, totalViews DESC, reactionCount DESC, latestReactionAt DESC, titleKo ASC`;
 
   const result = await db
     .prepare(
@@ -450,8 +649,12 @@ export const getContentList = async (
           cat.slug AS categorySlug,
           cat.name_ko AS categoryNameKo,
           c.release_year AS releaseYear,
+          c.release_date AS releaseDate,
           c.thumbnail_url AS thumbnailUrl,
           c.description AS description,
+          c.hero_message_ko AS heroMessageKo,
+          c.priority_score AS priorityScore,
+          ${buildEditorialPickExpression("c")} AS isEditorialPick,
           COUNT(rv.id) AS reactionCount,
           COALESCE(SUM(rv.view_count), 0) AS totalViews,
           MAX(rv.published_at) AS latestReactionAt
@@ -471,13 +674,16 @@ export const getContentList = async (
           cat.slug,
           cat.name_ko,
           c.release_year,
+          c.release_date,
           c.thumbnail_url,
-          c.description
+          c.description,
+          c.hero_message_ko,
+          c.priority_score
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
       `,
     )
-    .bind(...bindings, options.limit, (options.page - 1) * options.limit)
+    .bind(...bindings, ...orderBindings, options.limit, (options.page - 1) * options.limit)
     .all<ContentSummaryRow>();
 
   const totalRow = await db
@@ -516,12 +722,17 @@ export const getContentBySlug = async (
           cat.slug AS categorySlug,
           cat.name_ko AS categoryNameKo,
           c.release_year AS releaseYear,
+          c.release_date AS releaseDate,
           c.thumbnail_url AS thumbnailUrl,
           c.description AS description,
+          c.hero_message_ko AS heroMessageKo,
+          c.priority_score AS priorityScore,
+          ${buildEditorialPickExpression("c")} AS isEditorialPick,
           COUNT(rv.id) AS reactionCount,
           COALESCE(SUM(rv.view_count), 0) AS totalViews,
           MAX(rv.published_at) AS latestReactionAt,
-          c.aliases_json AS aliasesJson
+          c.aliases_json AS aliasesJson,
+          c.search_keywords_json AS searchKeywordsJson
         FROM contents c
         JOIN categories cat
           ON cat.id = c.category_id
@@ -539,9 +750,13 @@ export const getContentBySlug = async (
           cat.slug,
           cat.name_ko,
           c.release_year,
+          c.release_date,
           c.thumbnail_url,
           c.description,
-          c.aliases_json
+          c.hero_message_ko,
+          c.priority_score,
+          c.aliases_json,
+          c.search_keywords_json
       `,
     )
     .bind(slug)
@@ -554,6 +769,7 @@ export const getContentBySlug = async (
   return {
     ...mapContentSummary(row),
     aliases: parseJsonArray(row.aliasesJson),
+    searchKeywords: parseJsonArray(row.searchKeywordsJson),
   };
 };
 
@@ -794,13 +1010,16 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
           c.title_ko AS titleKo,
           c.title_en AS titleEn,
           c.aliases_json AS aliasesJson,
+          c.search_keywords_json AS searchKeywordsJson,
+          c.priority_score AS priorityScore,
           cat.slug AS categorySlug,
           cat.name_ko AS categoryNameKo
         FROM contents c
         JOIN categories cat
           ON cat.id = c.category_id
         WHERE c.status = 'active'
-        ORDER BY cat.sort_order ASC, c.id ASC
+          AND cat.is_active = 1
+        ORDER BY c.priority_score DESC, cat.sort_order ASC, c.id ASC
       `,
     )
     .all<{
@@ -808,6 +1027,8 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
       categoryNameKo: string;
       categorySlug: CategorySlug;
       id: number;
+      priorityScore: number;
+      searchKeywordsJson: string | null;
       slug: string;
       titleEn: string | null;
       titleKo: string;
@@ -821,6 +1042,8 @@ export const getActiveContentsForSync = async (db: D1Database): Promise<SyncCont
     categorySlug: row.categorySlug,
     categoryNameKo: toStringValue(row.categoryNameKo),
     aliases: parseJsonArray(row.aliasesJson),
+    searchKeywords: parseJsonArray(row.searchKeywordsJson),
+    priorityScore: toNumber(row.priorityScore),
   }));
 };
 

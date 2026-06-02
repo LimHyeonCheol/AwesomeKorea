@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+﻿import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import type { ContentStatus, HomeSiteCopy } from "@awesomekorea/shared";
@@ -77,7 +77,7 @@ const assertInternalToken = (c: {
   if (!expectedToken) {
     if (appEnv !== "local") {
       throw new HTTPException(503, {
-        message: "운영 내부 API 토큰이 설정되지 않았습니다.",
+        message: "?댁쁺 ?대? API ?좏겙???ㅼ젙?섏? ?딆븯?듬땲??",
       });
     }
 
@@ -88,7 +88,7 @@ const assertInternalToken = (c: {
 
   if (!authorizationHeader?.startsWith("Bearer ")) {
     throw new HTTPException(401, {
-      message: "내부 API 토큰이 필요합니다.",
+      message: "?대? API ?좏겙???꾩슂?⑸땲??",
     });
   }
 
@@ -96,7 +96,7 @@ const assertInternalToken = (c: {
 
   if (providedToken !== expectedToken) {
     throw new HTTPException(401, {
-      message: "내부 API 토큰이 유효하지 않습니다.",
+      message: "?대? API ?좏겙???좏슚?섏? ?딆뒿?덈떎.",
     });
   }
 };
@@ -117,7 +117,7 @@ const readJsonBody = async (c: {
     return (await c.req.json()) as Record<string, unknown>;
   } catch {
     throw new HTTPException(400, {
-      message: "요청 본문이 올바른 JSON 형식이 아니에요.",
+      message: "?붿껌 蹂몃Ц???щ컮瑜?JSON ?뺤떇???꾨땲?먯슂.",
     });
   }
 };
@@ -125,7 +125,7 @@ const readJsonBody = async (c: {
 const requireStringField = (value: unknown, fieldLabel: string) => {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new HTTPException(400, {
-      message: `${fieldLabel} 값을 입력해 주세요.`,
+      message: `${fieldLabel} 媛믪쓣 ?낅젰??二쇱꽭??`,
     });
   }
 
@@ -174,13 +174,13 @@ const parseIntegerField = (
 
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
     throw new HTTPException(400, {
-      message: `${fieldLabel} 값은 정수여야 합니다.`,
+      message: `${fieldLabel} 媛믪? ?뺤닔?ъ빞 ?⑸땲??`,
     });
   }
 
   if (options.min !== undefined && parsed < options.min) {
     throw new HTTPException(400, {
-      message: `${fieldLabel} 값은 ${options.min} 이상이어야 합니다.`,
+      message: `${fieldLabel} 媛믪? ${options.min} ?댁긽?댁뼱???⑸땲??`,
     });
   }
 
@@ -208,17 +208,17 @@ const parseContentStatusField = (value: unknown): ContentStatus => {
   }
 
   throw new HTTPException(400, {
-    message: "콘텐츠 상태는 active 또는 hidden 이어야 합니다.",
+    message: "肄섑뀗痢??곹깭??active ?먮뒗 hidden ?댁뼱???⑸땲??",
   });
 };
 
 const parseHomeSettingsPayload = (payload: Record<string, unknown>): HomeSiteCopy => ({
-  brandName: requireStringField(payload.brandName, "브랜드명"),
-  brandTagline: requireStringField(payload.brandTagline, "브랜드 태그라인"),
-  heroBadge: requireStringField(payload.heroBadge, "히어로 배지"),
-  heroToolbarCopy: requireStringField(payload.heroToolbarCopy, "히어로 상단 문구"),
-  heroTitle: requireStringField(payload.heroTitle, "대문 제목"),
-  heroDescription: requireStringField(payload.heroDescription, "대문 설명"),
+  brandName: requireStringField(payload.brandName, "釉뚮옖?쒕챸"),
+  brandTagline: requireStringField(payload.brandTagline, "釉뚮옖???쒓렇?쇱씤"),
+  heroBadge: requireStringField(payload.heroBadge, "?덉뼱濡?諛곗?"),
+  heroToolbarCopy: requireStringField(payload.heroToolbarCopy, "?덉뼱濡??곷떒 臾멸뎄"),
+  heroTitle: requireStringField(payload.heroTitle, "?臾??쒕ぉ"),
+  heroDescription: requireStringField(payload.heroDescription, "?臾??ㅻ챸"),
 });
 
 const parseCategoryPayload = (payload: Record<string, unknown>) => ({
@@ -236,14 +236,21 @@ const parseContentPayload = (payload: Record<string, unknown>) => ({
     min: 1,
   }) as number,
   slug: requireStringField(payload.slug, "콘텐츠 slug"),
-  titleKo: requireStringField(payload.titleKo, "콘텐츠 제목(한글)"),
+  titleKo: requireStringField(payload.titleKo, "콘텐츠 제목(국문)"),
   titleEn: optionalStringField(payload.titleEn),
   aliases: parseAliasesField(payload.aliases),
   releaseYear: parseIntegerField(payload.releaseYear, "출시 연도", {
     allowNull: true,
   }) as number | null,
+  releaseDate: optionalStringField(payload.releaseDate),
   thumbnailUrl: optionalStringField(payload.thumbnailUrl),
   description: optionalStringField(payload.description),
+  searchKeywords: parseAliasesField(payload.searchKeywords),
+  priorityScore: parseIntegerField(payload.priorityScore, "우선순위", {
+    fallback: 0,
+    min: 0,
+  }) as number,
+  heroMessageKo: optionalStringField(payload.heroMessageKo),
   status: parseContentStatusField(payload.status),
 });
 
@@ -251,7 +258,7 @@ const parseReactionPayload = (payload: Record<string, unknown>) => ({
   adminTitle: optionalStringField(payload.adminTitle),
   adminDescription: optionalStringField(payload.adminDescription),
   isFeatured: parseBooleanField(payload.isFeatured, false),
-  featuredOrder: parseIntegerField(payload.featuredOrder, "메인 노출 순서", {
+  featuredOrder: parseIntegerField(payload.featuredOrder, "硫붿씤 ?몄텧 ?쒖꽌", {
     fallback: 0,
     min: 0,
   }) as number,
@@ -325,7 +332,7 @@ app.get("/api/contents/:slug", async (c) => {
 
       if (!content) {
         throw new HTTPException(404, {
-          message: "콘텐츠를 찾을 수 없습니다.",
+          message: "肄섑뀗痢좊? 李얠쓣 ???놁뒿?덈떎.",
         });
       }
 
@@ -341,7 +348,7 @@ app.get("/api/contents/:slug", async (c) => {
 
   if (!payload) {
     throw new HTTPException(404, {
-      message: "콘텐츠를 찾을 수 없습니다.",
+      message: "肄섑뀗痢좊? 李얠쓣 ???놁뒿?덈떎.",
     });
   }
 
@@ -355,7 +362,7 @@ app.get("/api/contents/:slug/reactions", async (c) => {
 
   if (!content) {
     throw new HTTPException(404, {
-      message: "콘텐츠를 찾을 수 없습니다.",
+      message: "肄섑뀗痢좊? 李얠쓣 ???놁뒿?덈떎.",
     });
   }
 
@@ -400,7 +407,7 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
 
   if (!YOUTUBE_VIDEO_ID_PATTERN.test(youtubeVideoId)) {
     throw new HTTPException(400, {
-      message: "유효한 유튜브 영상 ID가 아니에요.",
+      message: "?좏슚???좏뒠釉??곸긽 ID媛 ?꾨땲?먯슂.",
     });
   }
 
@@ -408,7 +415,7 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
 
   if (!reactionContext) {
     throw new HTTPException(404, {
-      message: "댓글을 불러올 반응 영상을 찾을 수 없어요.",
+      message: "?볤???遺덈윭??諛섏쓳 ?곸긽??李얠쓣 ???놁뼱??",
     });
   }
 
@@ -417,7 +424,7 @@ app.get("/api/reactions/:youtubeVideoId/comments", async (c) => {
       createUnavailableCommentsPayload(
         youtubeVideoId,
         reactionContext.commentCount,
-        "댓글 API 키가 설정되지 않아 지금은 댓글을 불러올 수 없어요.",
+        "?볤? API ?ㅺ? ?ㅼ젙?섏? ?딆븘 吏湲덉? ?볤???遺덈윭?????놁뼱??",
         limit,
       ),
     );
@@ -462,13 +469,13 @@ app.get("/api/reactions/:youtubeVideoId/comments/:commentId/replies", async (c) 
 
   if (!YOUTUBE_VIDEO_ID_PATTERN.test(youtubeVideoId)) {
     throw new HTTPException(400, {
-      message: "?좏슚???좏뒠釉??곸긽 ID媛 ?꾨땲?먯슂.",
+      message: "?醫륁뒞???醫뤿뮔???怨멸맒 ID揶쎛 ?袁⑤빍?癒?뒄.",
     });
   }
 
   if (!commentId) {
     throw new HTTPException(400, {
-      message: "?볤? ID媛 ?꾩슂?⑸땲??",
+      message: "?蹂? ID揶쎛 ?袁⑹뒄??몃빍??",
     });
   }
 
@@ -476,7 +483,7 @@ app.get("/api/reactions/:youtubeVideoId/comments/:commentId/replies", async (c) 
 
   if (!reactionContext) {
     throw new HTTPException(404, {
-      message: "?볤???遺덈윭??諛섏쓳 ?곸긽??李얠쓣 ???놁뼱??",
+      message: "?蹂????븍뜄???獄쏆꼷???怨멸맒??筌≪뼚??????곷선??",
     });
   }
 
@@ -485,7 +492,7 @@ app.get("/api/reactions/:youtubeVideoId/comments/:commentId/replies", async (c) 
       createUnavailableRepliesPayload(
         youtubeVideoId,
         commentId,
-        "?볤? API ?ㅺ? ?ㅼ젙?섏? ?딆븘 吏湲덉? ?듦??遺덈윭?????놁뼱??",
+        "?蹂? API ??? ??쇱젟??? ??녿툡 筌왖疫뀀뜆? ?????븍뜄???????곷선??",
       ),
     );
   }
@@ -557,7 +564,7 @@ app.put("/api/admin/categories/:id", async (c) => {
   assertInternalToken(c);
   c.header("Cache-Control", "no-store");
 
-  const categoryId = parseIntegerField(c.req.param("id"), "카테고리 ID", {
+  const categoryId = parseIntegerField(c.req.param("id"), "移댄뀒怨좊━ ID", {
     min: 1,
   }) as number;
   const payload = parseCategoryPayload(await readJsonBody(c));
@@ -586,7 +593,7 @@ app.put("/api/admin/contents/:id", async (c) => {
   assertInternalToken(c);
   c.header("Cache-Control", "no-store");
 
-  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
+  const contentId = parseIntegerField(c.req.param("id"), "肄섑뀗痢?ID", {
     min: 1,
   }) as number;
   const payload = parseContentPayload(await readJsonBody(c));
@@ -606,7 +613,7 @@ app.put("/api/admin/reactions/:youtubeVideoId", async (c) => {
 
   if (!youtubeVideoId) {
     throw new HTTPException(400, {
-      message: "유튜브 영상 ID가 필요합니다.",
+      message: "?좏뒠釉??곸긽 ID媛 ?꾩슂?⑸땲??",
     });
   }
 
@@ -672,7 +679,7 @@ app.onError((error, c) => {
   if (normalizedMessage.includes("UNIQUE constraint failed")) {
     return c.json(
       {
-        message: "이미 같은 식별자를 가진 데이터가 있어 저장하지 못했습니다.",
+        message: "?대? 媛숈? ?앸퀎?먮? 媛吏??곗씠?곌? ?덉뼱 ??ν븯吏 紐삵뻽?듬땲??",
       },
       409,
       headers,
@@ -681,7 +688,7 @@ app.onError((error, c) => {
 
   return c.json(
     {
-      message: "예상하지 못한 오류가 발생했습니다.",
+      message: "?덉긽?섏? 紐삵븳 ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.",
     },
     500,
     headers,

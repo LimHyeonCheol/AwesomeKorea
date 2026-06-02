@@ -21,8 +21,12 @@ export interface ContentSummary {
   categorySlug: CategorySlug;
   categoryNameKo: string;
   releaseYear: number | null;
+  releaseDate: string | null;
   thumbnailUrl: string | null;
   description: string | null;
+  heroMessageKo: string | null;
+  priorityScore: number;
+  isEditorialPick: boolean;
   reactionCount: number;
   totalViews: number;
   latestReactionAt: string | null;
@@ -30,6 +34,7 @@ export interface ContentSummary {
 
 export interface ContentDetail extends ContentSummary {
   aliases: string[];
+  searchKeywords: string[];
 }
 
 export interface ReactionVideo {
@@ -123,6 +128,7 @@ export interface HeroHighlight {
   categoryNameKo: string;
   reactionCount: number;
   message: string;
+  releaseDate: string | null;
 }
 
 export interface HomeSection {
@@ -151,9 +157,17 @@ export interface HomeFeaturedReaction {
   reaction: ReactionVideo;
 }
 
+export interface HomeFeaturedContent {
+  slotCode: string;
+  headline: string;
+  body: string | null;
+  content: ContentSummary;
+}
+
 export interface HomePayload {
   siteCopy: HomeSiteCopy;
   hero: HeroHighlight | null;
+  featuredContents: HomeFeaturedContent[];
   featuredReactions: HomeFeaturedReaction[];
   top10: HomeRankingItem[];
   popularByCategory: HomeSection[];
@@ -204,8 +218,12 @@ export interface AdminContent {
   titleEn: string | null;
   aliases: string[];
   releaseYear: number | null;
+  releaseDate: string | null;
   thumbnailUrl: string | null;
   description: string | null;
+  searchKeywords: string[];
+  priorityScore: number;
+  heroMessageKo: string | null;
   status: ContentStatus;
   reactionCount: number;
   totalViews: number;

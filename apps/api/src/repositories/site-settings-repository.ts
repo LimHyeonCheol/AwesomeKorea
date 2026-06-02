@@ -1,4 +1,5 @@
 import type {
+  CategorySlug,
   HomeFeaturedReaction,
   HomeSiteCopy,
   ReactionVideo,
@@ -14,7 +15,7 @@ interface SettingRow {
 
 interface FeaturedReactionRow {
   categoryNameKo: string;
-  categorySlug: string;
+  categorySlug: CategorySlug;
   channelName: string;
   commentCount: number;
   contentSlug: string;
@@ -231,7 +232,7 @@ export const getFeaturedHomeReactions = async (
     sortOrder: toNumber(row.featuredOrder),
     contentSlug: toStringValue(row.contentSlug),
     contentTitle: toStringValue(row.contentTitle),
-    categorySlug: toStringValue(row.categorySlug),
+    categorySlug: row.categorySlug,
     categoryNameKo: toStringValue(row.categoryNameKo),
     reactionCount: toNumber(row.reactionCount),
     totalViews: toNumber(row.totalViews),

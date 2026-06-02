@@ -5,6 +5,7 @@ const SEARCH_HINT_BY_CATEGORY: Record<CategorySlug, string> = {
   drama: "kdrama",
   webtoon: "webtoon",
   music: "song",
+  game: "game",
 };
 
 const DEFAULT_SEARCH_HINT = "korean content";
@@ -14,6 +15,7 @@ const CONTEXT_TERMS_BY_CATEGORY: Record<CategorySlug, string[]> = {
   drama: ["kdrama", "k drama", "korean drama", "gong yoo", "kim go eun"],
   webtoon: ["webtoon", "manhwa", "korean", "adaptation", "anime"],
   music: ["song", "music", "mv", "performance", "ost", "lyrics", "cover"],
+  game: ["game", "gaming", "fps", "shooter", "campaign", "multiplayer", "call of duty", "cod"],
 };
 
 const DEFAULT_CONTEXT_TERMS = ["korean", "reaction", "review", "content"];
@@ -144,6 +146,7 @@ interface ReactionReferenceAnchor {
 export interface ReactionMatcherContent {
   aliases: string[];
   categorySlug: CategorySlug;
+  searchKeywords: string[];
   titleEn: string | null;
   titleKo: string;
 }
@@ -242,7 +245,7 @@ const matchesReferenceAnchor = (
 export const buildSearchKeywords = (content: ReactionMatcherContent) => {
   const anchors = buildReferenceAnchors(content);
   const categoryHint = SEARCH_HINT_BY_CATEGORY[content.categorySlug] ?? DEFAULT_SEARCH_HINT;
-  const queries: string[] = [];
+  const queries = uniqueValues(content.searchKeywords);
 
   for (const anchor of anchors) {
     if (containsKoreanCharacters(anchor.phrase)) {

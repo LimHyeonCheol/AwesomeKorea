@@ -3,6 +3,7 @@ import type {
   AdminDashboardPayload,
   AdminReactionVideo,
   Category,
+  CategorySlug,
   ContentStatus,
   HomeSiteCopy,
   TranslationSource,
@@ -29,10 +30,14 @@ interface AdminContentRow {
   categoryNameKo: string;
   categorySlug: string;
   description: string | null;
+  heroMessageKo: string | null;
   id: number;
   latestReactionAt: string | null;
+  priorityScore: number;
   reactionCount: number;
+  releaseDate: string | null;
   releaseYear: number | null;
+  searchKeywordsJson: string | null;
   slug: string;
   status: ContentStatus;
   thumbnailUrl: string | null;
@@ -86,7 +91,7 @@ const toTranslationSource = (
 
 const mapCategory = (row: AdminCategoryRow): Category => ({
   id: toNumber(row.id),
-  slug: toStringValue(row.slug),
+  slug: toStringValue(row.slug) as CategorySlug,
   nameKo: toStringValue(row.nameKo),
   sortOrder: toNumber(row.sortOrder),
   isActive: toBoolean(row.isActive),
@@ -102,8 +107,12 @@ const mapAdminContent = (row: AdminContentRow): AdminContent => ({
   titleEn: toNullableString(row.titleEn),
   aliases: parseJsonArray(row.aliasesJson),
   releaseYear: row.releaseYear === null ? null : toNumber(row.releaseYear),
+  releaseDate: toNullableString(row.releaseDate),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   description: toNullableString(row.description),
+  searchKeywords: parseJsonArray(row.searchKeywordsJson),
+  priorityScore: toNumber(row.priorityScore),
+  heroMessageKo: toNullableString(row.heroMessageKo),
   status: row.status,
   reactionCount: toNumber(row.reactionCount),
   totalViews: toNumber(row.totalViews),
@@ -142,6 +151,15 @@ const normalizeAliases = (aliases: string[]) =>
   Array.from(
     new Set(
       aliases
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  );
+
+const normalizeSearchKeywords = (keywords: string[]) =>
+  Array.from(
+    new Set(
+      keywords
         .map((value) => value.trim())
         .filter((value) => value.length > 0),
     ),
@@ -231,8 +249,12 @@ export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> 
           c.title_en AS titleEn,
           c.aliases_json AS aliasesJson,
           c.release_year AS releaseYear,
+          c.release_date AS releaseDate,
           c.thumbnail_url AS thumbnailUrl,
           c.description AS description,
+          c.search_keywords_json AS searchKeywordsJson,
+          c.priority_score AS priorityScore,
+          c.hero_message_ko AS heroMessageKo,
           c.status AS status,
           COUNT(rv.id) AS reactionCount,
           COALESCE(SUM(rv.view_count), 0) AS totalViews,
@@ -253,8 +275,12 @@ export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> 
           c.title_en,
           c.aliases_json,
           c.release_year,
+          c.release_date,
           c.thumbnail_url,
           c.description,
+          c.search_keywords_json,
+          c.priority_score,
+          c.hero_message_ko,
           c.status
         ORDER BY cat.sort_order ASC, c.updated_at DESC, c.id DESC
       `,
@@ -270,7 +296,11 @@ export const createAdminContent = async (
     aliases: string[];
     categoryId: number;
     description: string | null;
+    heroMessageKo: string | null;
+    priorityScore: number;
+    releaseDate: string | null;
     releaseYear: number | null;
+    searchKeywords: string[];
     slug: string;
     status: ContentStatus;
     thumbnailUrl: string | null;
@@ -288,12 +318,16 @@ export const createAdminContent = async (
           title_en,
           aliases_json,
           release_year,
+          release_date,
           thumbnail_url,
           description,
+          search_keywords_json,
+          priority_score,
+          hero_message_ko,
           status,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `,
     )
     .bind(
@@ -303,8 +337,12 @@ export const createAdminContent = async (
       input.titleEn,
       JSON.stringify(normalizeAliases(input.aliases)),
       input.releaseYear,
+      input.releaseDate,
       input.thumbnailUrl,
       input.description,
+      JSON.stringify(normalizeSearchKeywords(input.searchKeywords)),
+      input.priorityScore,
+      input.heroMessageKo,
       input.status,
     )
     .run();
@@ -317,7 +355,11 @@ export const updateAdminContent = async (
     aliases: string[];
     categoryId: number;
     description: string | null;
+    heroMessageKo: string | null;
+    priorityScore: number;
+    releaseDate: string | null;
     releaseYear: number | null;
+    searchKeywords: string[];
     slug: string;
     status: ContentStatus;
     thumbnailUrl: string | null;
@@ -336,8 +378,12 @@ export const updateAdminContent = async (
           title_en = ?,
           aliases_json = ?,
           release_year = ?,
+          release_date = ?,
           thumbnail_url = ?,
           description = ?,
+          search_keywords_json = ?,
+          priority_score = ?,
+          hero_message_ko = ?,
           status = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -350,8 +396,12 @@ export const updateAdminContent = async (
       input.titleEn,
       JSON.stringify(normalizeAliases(input.aliases)),
       input.releaseYear,
+      input.releaseDate,
       input.thumbnailUrl,
       input.description,
+      JSON.stringify(normalizeSearchKeywords(input.searchKeywords)),
+      input.priorityScore,
+      input.heroMessageKo,
       input.status,
       contentId,
     )

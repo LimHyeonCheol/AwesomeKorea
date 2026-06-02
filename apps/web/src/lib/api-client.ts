@@ -195,8 +195,12 @@ export const apiClient = {
       titleEn: string | null;
       aliases: string[];
       releaseYear: number | null;
+      releaseDate: string | null;
       thumbnailUrl: string | null;
       description: string | null;
+      searchKeywords: string[];
+      priorityScore: number;
+      heroMessageKo: string | null;
       status: ContentStatus;
     },
   ) =>
@@ -219,8 +223,12 @@ export const apiClient = {
       titleEn: string | null;
       aliases: string[];
       releaseYear: number | null;
+      releaseDate: string | null;
       thumbnailUrl: string | null;
       description: string | null;
+      searchKeywords: string[];
+      priorityScore: number;
+      heroMessageKo: string | null;
       status: ContentStatus;
     },
   ) =>

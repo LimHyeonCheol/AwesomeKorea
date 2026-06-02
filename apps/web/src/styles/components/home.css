@@ -502,6 +502,22 @@
   font-weight: 800;
 }
 
+.content-card__editorial-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 .content-card__category {
   display: inline-flex;
   align-items: center;
@@ -527,6 +543,19 @@
   color: var(--color-brand);
   font-size: 0.82rem;
   font-weight: 800;
+}
+
+.content-card__eyebrow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.content-card__release {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .content-card__title {

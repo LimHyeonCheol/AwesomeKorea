@@ -1,11 +1,12 @@
 import type {
   Category,
+  ContentDetail,
   ContentDetailPayload,
-  ReactionCommentRepliesPayload,
-  ReactionCommentsPayload,
   ContentSummary,
   HomePayload,
   PaginatedResponse,
+  ReactionCommentRepliesPayload,
+  ReactionCommentsPayload,
   ReactionListPayload,
   ReactionVideo,
 } from "@awesomekorea/shared";
@@ -13,16 +14,17 @@ import type {
 const previewCategories: Category[] = [
   { id: 1, slug: "movie", nameKo: "영화", sortOrder: 1, isActive: true },
   { id: 2, slug: "drama", nameKo: "드라마", sortOrder: 2, isActive: true },
-  { id: 3, slug: "webtoon", nameKo: "만화", sortOrder: 3, isActive: true },
-  { id: 4, slug: "music", nameKo: "노래", sortOrder: 4, isActive: true },
+  { id: 3, slug: "webtoon", nameKo: "웹툰", sortOrder: 3, isActive: true },
+  { id: 4, slug: "music", nameKo: "음악", sortOrder: 4, isActive: true },
+  { id: 5, slug: "game", nameKo: "게임", sortOrder: 5, isActive: true },
 ];
 
-type PreviewContent = ContentSummary & {
-  aliases: string[];
-};
+type PreviewContent = ContentDetail;
+
+const createContent = (content: PreviewContent) => content;
 
 const previewContents: PreviewContent[] = [
-  {
+  createContent({
     id: 1,
     slug: "extreme-job",
     titleKo: "극한직업",
@@ -30,118 +32,107 @@ const previewContents: PreviewContent[] = [
     categorySlug: "movie",
     categoryNameKo: "영화",
     releaseYear: 2019,
+    releaseDate: "2019-01-23",
     thumbnailUrl: null,
-    description: "해외 유튜브에서 반응이 빠르게 늘고 있는 코미디 영화",
+    description: "해외 반응이 꾸준히 이어지는 한국 코미디 영화입니다.",
+    heroMessageKo: "웃음과 액션 템포가 빨라 해외 리액션 몰입도가 높은 작품입니다.",
+    priorityScore: 30,
+    isEditorialPick: false,
     reactionCount: 47,
     totalViews: 2100000,
     latestReactionAt: "2026-05-30T00:00:00.000Z",
-    aliases: ["Extreme Job", "극한직업 reaction", "Korean comedy movie"],
-  },
-  {
+    aliases: ["Extreme Job", "극한직업 reaction"],
+    searchKeywords: ["Extreme Job reaction", "\"Extreme Job\" first time watching"],
+  }),
+  createContent({
     id: 2,
-    slug: "new-journey-to-the-west",
-    titleKo: "신서유기",
-    titleEn: "New Journey to the West",
+    slug: "squid-game-2",
+    titleKo: "오징어 게임 시즌 2",
+    titleEn: "Squid Game Season 2",
     categorySlug: "drama",
     categoryNameKo: "드라마",
-    releaseYear: 2015,
+    releaseYear: 2026,
+    releaseDate: "2026-12",
     thumbnailUrl: null,
-    description: "예능성 포인트를 좋아하는 해외 채널 반응이 빠른 콘텐츠",
-    reactionCount: 33,
-    totalViews: 1800000,
-    latestReactionAt: "2026-05-30T02:00:00.000Z",
-    aliases: ["신서유기 reaction", "New Journey to the West"],
-  },
-  {
+    description: "트레일러 공개 직후 글로벌 반응이 크게 모이는 대표 드라마입니다.",
+    heroMessageKo: "신작 기대감이 높아 홈 추천 영역에서 주목도가 좋은 작품입니다.",
+    priorityScore: 60,
+    isEditorialPick: true,
+    reactionCount: 110,
+    totalViews: 6100000,
+    latestReactionAt: "2026-05-30T04:10:00.000Z",
+    aliases: ["Squid Game Season 2", "오징어 게임 시즌 2"],
+    searchKeywords: ["\"Squid Game Season 2\" reaction", "\"Squid Game Season 2\" trailer reaction"],
+  }),
+  createContent({
     id: 3,
     slug: "apt",
     titleKo: "APT.",
     titleEn: "APT.",
     categorySlug: "music",
-    categoryNameKo: "노래",
+    categoryNameKo: "음악",
     releaseYear: 2024,
+    releaseDate: "2024-10-18",
     thumbnailUrl: null,
-    description: "뮤직비디오와 라이브 클립 기반 리액션이 많은 대표 트랙",
+    description: "뮤직비디오와 라이브 퍼포먼스 반응이 빠르게 쌓이는 곡입니다.",
+    heroMessageKo: "보컬 분석과 퍼포먼스 반응이 함께 잘 모이는 음악 카테고리 대표 사례입니다.",
+    priorityScore: 25,
+    isEditorialPick: false,
     reactionCount: 91,
     totalViews: 5400000,
     latestReactionAt: "2026-05-30T05:00:00.000Z",
     aliases: ["APT reaction", "Rose Bruno Mars APT"],
-  },
-  {
+    searchKeywords: ["\"APT\" reaction song", "\"APT\" vocal breakdown"],
+  }),
+  createContent({
     id: 4,
     slug: "solo-leveling",
     titleKo: "나 혼자만 레벨업",
     titleEn: "Solo Leveling",
     categorySlug: "webtoon",
-    categoryNameKo: "만화",
+    categoryNameKo: "웹툰",
     releaseYear: 2018,
+    releaseDate: "2018-03",
     thumbnailUrl: null,
-    description: "애니화 이후 해외 리액션 수집 가치가 높은 대표 IP",
+    description: "웹툰과 애니메이션 양쪽에서 반응을 끌어오는 대표 IP입니다.",
+    heroMessageKo: "해외 팬덤이 넓어 시즌 이슈마다 꾸준히 신규 반응이 유입됩니다.",
+    priorityScore: 35,
+    isEditorialPick: false,
     reactionCount: 28,
     totalViews: 1600000,
     latestReactionAt: "2026-05-29T23:45:00.000Z",
-    aliases: ["Solo Leveling reaction", "나 혼자만 레벨업"],
-  },
-  {
+    aliases: ["Solo Leveling", "나 혼자만 레벨업"],
+    searchKeywords: ["\"Solo Leveling\" reaction webtoon", "\"Solo Leveling\" episode 1 reaction"],
+  }),
+  createContent({
     id: 5,
-    slug: "parasite",
-    titleKo: "기생충",
-    titleEn: "Parasite",
-    categorySlug: "movie",
-    categoryNameKo: "영화",
-    releaseYear: 2019,
-    thumbnailUrl: null,
-    description: "분석형 리뷰와 첫 감상 영상이 꾸준히 쌓이는 작품",
-    reactionCount: 62,
-    totalViews: 3200000,
-    latestReactionAt: "2026-05-29T18:30:00.000Z",
-    aliases: ["Parasite reaction", "기생충 review"],
-  },
-  {
-    id: 6,
-    slug: "squid-game-2",
-    titleKo: "오징어게임 S2",
-    titleEn: "Squid Game Season 2",
-    categorySlug: "drama",
-    categoryNameKo: "드라마",
+    slug: "call-of-duty-modern-warfare-4",
+    titleKo: "콜 오브 듀티: 모던 워페어 4",
+    titleEn: "Call of Duty: Modern Warfare 4",
+    categorySlug: "game",
+    categoryNameKo: "게임",
     releaseYear: 2026,
+    releaseDate: "2026-10",
     thumbnailUrl: null,
-    description: "최신순과 인기순 모두 강한 글로벌 반응 콘텐츠",
-    reactionCount: 110,
-    totalViews: 6100000,
-    latestReactionAt: "2026-05-30T04:10:00.000Z",
-    aliases: ["Squid Game Season 2 reaction", "오징어게임 시즌2"],
-  },
-  {
-    id: 7,
-    slug: "guardian",
-    titleKo: "도깨비",
-    titleEn: "Guardian",
-    categorySlug: "drama",
-    categoryNameKo: "드라마",
-    releaseYear: 2016,
-    thumbnailUrl: null,
-    description: "클래식 드라마 리액션 확보용 기준 콘텐츠",
-    reactionCount: 38,
-    totalViews: 2900000,
-    latestReactionAt: "2026-05-29T08:10:00.000Z",
-    aliases: ["Goblin reaction", "도깨비 reaction"],
-  },
-  {
-    id: 8,
-    slug: "bokmyeon-song",
-    titleKo: "복면가왕 레전드 무대",
-    titleEn: "King of Mask Singer Highlights",
-    categorySlug: "music",
-    categoryNameKo: "노래",
-    releaseYear: 2025,
-    thumbnailUrl: null,
-    description: "예능형 음악 반응을 담기 위한 시드 카드",
-    reactionCount: 22,
-    totalViews: 1200000,
-    latestReactionAt: "2026-05-29T12:00:00.000Z",
-    aliases: ["King of Mask Singer reaction", "복면가왕 reaction"],
-  },
+    description: "요구사항 3의 우선 편성 대상 콘텐츠로, 글로벌 리액션과 해설 영상 수집을 강화합니다.",
+    heroMessageKo: "2026년 10월 출시 예정 기준으로 홈 히어로와 게임 대표 슬롯에 우선 편성합니다.",
+    priorityScore: 100,
+    isEditorialPick: true,
+    reactionCount: 18,
+    totalViews: 980000,
+    latestReactionAt: "2026-06-02T08:00:00.000Z",
+    aliases: [
+      "Call of Duty Modern Warfare 4",
+      "COD MW4",
+      "모던 워페어 4",
+      "콜 오브 듀티 모던 워페어 4",
+    ],
+    searchKeywords: [
+      "\"Call of Duty: Modern Warfare 4\" reaction game",
+      "\"COD MW4\" reaction",
+      "\"Modern Warfare 4\" trailer reaction",
+    ],
+  }),
 ];
 
 const createReaction = (
@@ -151,39 +142,25 @@ const createReaction = (
   publishedAt: string,
   viewCount: number,
   channelName: string,
-  options: {
-    description?: string | null;
-    descriptionOriginal?: string | null;
-    titleOriginal?: string;
-    titleTranslationSource?: ReactionVideo["titleTranslationSource"];
-  } = {},
+  overrides: Partial<ReactionVideo> = {},
 ): ReactionVideo => ({
   id,
   youtubeVideoId,
   title,
-  titleOriginal: options.titleOriginal ?? title,
-  titleTranslationSource:
-    options.titleTranslationSource ??
-    ((options.titleOriginal ?? title) === title ? "original" : "machine"),
-  hasTitleTranslation: (options.titleOriginal ?? title) !== title,
-  description: options.description ?? null,
-  descriptionOriginal: options.descriptionOriginal ?? options.description ?? null,
-  descriptionTranslationSource:
-    options.description && options.descriptionOriginal && options.description !== options.descriptionOriginal
-      ? "machine"
-      : options.description
-        ? "original"
-        : null,
-  hasDescriptionTranslation:
-    Boolean(options.description) &&
-    (options.descriptionOriginal ?? options.description ?? null) !== options.description,
-  thumbnailUrl: null,
+  titleOriginal: overrides.titleOriginal ?? title,
+  titleTranslationSource: overrides.titleTranslationSource ?? "original",
+  hasTitleTranslation: overrides.hasTitleTranslation ?? false,
+  description: overrides.description ?? null,
+  descriptionOriginal: overrides.descriptionOriginal ?? overrides.description ?? null,
+  descriptionTranslationSource: overrides.descriptionTranslationSource ?? null,
+  hasDescriptionTranslation: overrides.hasDescriptionTranslation ?? false,
+  thumbnailUrl: overrides.thumbnailUrl ?? null,
   publishedAt,
   viewCount,
-  likeCount: Math.floor(viewCount / 16),
-  commentCount: Math.floor(viewCount / 180),
+  likeCount: overrides.likeCount ?? Math.floor(viewCount / 18),
+  commentCount: overrides.commentCount ?? Math.floor(viewCount / 150),
   youtubeUrl: `https://www.youtube.com/watch?v=${youtubeVideoId}`,
-  embedUrl: `https://www.youtube.com/embed/${youtubeVideoId}`,
+  embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeVideoId}?playsinline=1&rel=0&modestbranding=1`,
   channelName,
 });
 
@@ -191,251 +168,150 @@ const previewReactions: Record<string, ReactionVideo[]> = {
   "extreme-job": [
     createReaction(
       1,
-      "react-001",
-      "극한직업 보고 충격받은 미국인 반응",
+      "exjobrx0001",
+      "Americans react to Extreme Job",
       "2026-05-30T00:00:00.000Z",
       312000,
       "ReactKing",
+      {
+        description: "미국 시청자들이 한국 코미디의 빠른 전개와 액션 전환에 놀라는 반응입니다.",
+        descriptionOriginal:
+          "The hosts were surprised by how quickly the comedy escalated into action.",
+        descriptionTranslationSource: "machine",
+        hasDescriptionTranslation: true,
+      },
     ),
     createReaction(
       2,
-      "react-002",
-      "Americans watch Extreme Job for the first time",
+      "exjobrx0002",
+      "Extreme Job first time watch",
       "2026-05-29T20:00:00.000Z",
       208000,
       "FilmReact",
     ),
-    createReaction(
-      3,
-      "react-003",
-      "이 영화 진짜임? | 극한직업 리액션",
-      "2026-05-29T12:30:00.000Z",
-      177000,
-      "WatchKorea",
-    ),
   ],
   "squid-game-2": [
     createReaction(
-      4,
-      "react-008",
+      3,
+      "sqg2trlr001",
       "Squid Game Season 2 trailer reaction",
       "2026-05-30T04:10:00.000Z",
       620000,
-      "ReactKing",
-    ),
-    createReaction(
-      5,
-      "react-013",
-      "Everyone is talking about Squid Game Season 2",
-      "2026-05-30T03:30:00.000Z",
-      310000,
       "DramaScope",
+      {
+        description: "새 시즌의 규모감과 긴장감을 중심으로 한 트레일러 반응입니다.",
+      },
     ),
   ],
   apt: [
     createReaction(
-      6,
-      "react-005",
+      4,
+      "aptmvreact1",
       "APT. MV reaction and vocal breakdown",
       "2026-05-30T05:00:00.000Z",
       540000,
       "Kpop Room",
+      {
+        description: "뮤직비디오의 보컬 레이어와 퍼포먼스를 함께 해설하는 반응입니다.",
+      },
+    ),
+  ],
+  "solo-leveling": [
+    createReaction(
+      5,
+      "sololv00001",
+      "Solo Leveling episode 1 reaction",
+      "2026-05-29T23:45:00.000Z",
+      130000,
+      "AnimeOrbit",
+    ),
+  ],
+  "call-of-duty-modern-warfare-4": [
+    createReaction(
+      6,
+      "codmw4rx01a",
+      "Call of Duty: Modern Warfare 4 trailer reaction",
+      "2026-06-02T08:00:00.000Z",
+      420000,
+      "GlobalFPS",
+      {
+        description: "게임 플레이 연출과 캠페인 복귀 포인트를 중심으로 정리한 대표 리액션입니다.",
+        titleOriginal: "Call of Duty: Modern Warfare 4 trailer reaction",
+      },
+    ),
+    createReaction(
+      7,
+      "codmw4rx02b",
+      "FPS fans react to COD MW4 reveal",
+      "2026-06-01T23:40:00.000Z",
+      240000,
+      "ShooterLab",
     ),
   ],
 };
 
-const previewComments: Record<string, ReactionCommentsPayload> = {
-  "react-001": {
-    locale: "ko",
-    videoId: "react-001",
-    status: "ok",
-    order: "relevance",
-    strategy: "topN",
-    fetchedAll: false,
-    pageSize: 20,
-    fetchedCount: 3,
-    totalCommentCount: 1400,
-    estimatedQuotaUnits: 1,
-    message:
-      "댓글 1개마다 quota가 차감되는 구조는 아니지만, 페이지 요청마다 quota 1이 소모돼 인기 댓글 50개만 먼저 보여드려요.",
-    items: [
-      {
-        id: "preview-comment-1",
-        authorDisplayName: "MovieLover88",
-        authorProfileImageUrl: null,
-        text:
-          "이 영화는 액션 템포도 좋지만 코미디 타이밍이 정말 좋네요. 해외 반응이 많은 이유를 알겠어요.",
-        originalText:
-          "???곹솕???≪뀡 ?쒗룷??醫뗭?留?肄붾?????대컢???뺣쭚 醫뗫꽕?? ?댁쇅 諛섏쓳??留롮? ?댁쑀瑜??뚭쿋?댁슂.",
-        translationSource: "original",
-        hasTranslation: false,
-        likeCount: 328,
-        publishedAt: "2026-05-30T02:12:00.000Z",
-        updatedAt: "2026-05-30T02:12:00.000Z",
-        replyCount: 2,
-        replies: [
-          {
-            id: "preview-comment-1-reply-1",
-            authorDisplayName: "KoreanCinemaClub",
-            authorProfileImageUrl: null,
-            text: "특히 후반부 전개가 외국 시청자에게도 잘 먹히는 것 같아요.",
-            originalText: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
-            translationSource: "original",
-            hasTranslation: false,
-            likeCount: 41,
-            publishedAt: "2026-05-30T03:05:00.000Z",
-          },
-        ],
-      },
-      {
-        id: "preview-comment-2",
-        authorDisplayName: "FirstTimeWatcher",
-        authorProfileImageUrl: null,
-        text: "처음 봤는데 생각보다 더 세련된 연출이라 놀랐습니다.",
-        originalText: "泥섏쓬 遊ㅻ뒗???앷컖蹂대떎 ???몃젴???곗텧?대씪 ??먯뒿?덈떎.",
-        translationSource: "original",
-        hasTranslation: false,
-        likeCount: 174,
-        publishedAt: "2026-05-30T04:20:00.000Z",
-        updatedAt: "2026-05-30T04:20:00.000Z",
-        replyCount: 0,
-        replies: [],
-      },
-      {
-        id: "preview-comment-3",
-        authorDisplayName: "LaughTrackDaily",
-        authorProfileImageUrl: null,
-        text: "채널 주인장 리액션도 좋지만 관객 반응 같이 보는 재미가 있네요.",
-        originalText: "梨꾨꼸 二쇱씤??由ъ븸?섎룄 醫뗭?留?愿媛?諛섏쓳 媛숈씠 蹂대뒗 ?щ?媛 ?덈꽕??",
-        translationSource: "original",
-        hasTranslation: false,
-        likeCount: 102,
-        publishedAt: "2026-05-30T06:10:00.000Z",
-        updatedAt: "2026-05-30T06:10:00.000Z",
-        replyCount: 1,
-        replies: [
-          {
-            id: "preview-comment-3-reply-1",
-            authorDisplayName: "GlobalViewer",
-            authorProfileImageUrl: null,
-            text: "그래서 이 앱에서 댓글 같이 보는 구성이 잘 어울려요.",
-            originalText: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
-            translationSource: "original",
-            hasTranslation: false,
-            likeCount: 18,
-            publishedAt: "2026-05-30T06:44:00.000Z",
-          },
-        ],
-      },
-    ],
-  },
-};
+const previewContentMap = new Map(previewContents.map((content) => [content.slug, content]));
 
-const previewReplies: Record<string, ReactionCommentRepliesPayload> = {
-  "react-001:preview-comment-1": {
-    locale: "ko",
-    videoId: "react-001",
-    commentId: "preview-comment-1",
-    status: "ok",
-    fetchedCount: 1,
-    estimatedQuotaUnits: 1,
-    message: "답글을 한국어로 정리했어요.",
-    items: [
-      {
-        id: "preview-comment-1-reply-1",
-        authorDisplayName: "KoreanCinemaClub",
-        authorProfileImageUrl: null,
-        text: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
-        originalText: "?뱁엳 ?꾨컲遺 ?꾧컻媛 ?멸뎅 ?쒖껌?먯뿉寃뚮룄 ??癒뱁엳??寃?媛숈븘??",
-        translationSource: "original",
-        hasTranslation: false,
-        likeCount: 41,
-        publishedAt: "2026-05-30T03:05:00.000Z",
-      },
-    ],
-  },
-  "react-001:preview-comment-3": {
-    locale: "ko",
-    videoId: "react-001",
-    commentId: "preview-comment-3",
-    status: "ok",
-    fetchedCount: 1,
-    estimatedQuotaUnits: 1,
-    message: "답글을 한국어로 정리했어요.",
-    items: [
-      {
-        id: "preview-comment-3-reply-1",
-        authorDisplayName: "GlobalViewer",
-        authorProfileImageUrl: null,
-        text: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
-        originalText: "洹몃옒?????깆뿉???볤? 媛숈씠 蹂대뒗 援ъ꽦?????댁슱?ㅼ슂.",
-        translationSource: "original",
-        hasTranslation: false,
-        likeCount: 18,
-        publishedAt: "2026-05-30T06:44:00.000Z",
-      },
-    ],
-  },
-};
-
-for (const content of previewContents) {
-  if (!previewReactions[content.slug]) {
-    previewReactions[content.slug] = [
-      createReaction(
-        1000 + content.id,
-        `${content.slug}-featured`,
-        `${content.titleKo} 대표 리액션`,
-        content.latestReactionAt ?? "2026-05-29T00:00:00.000Z",
-        Math.max(Math.floor(content.totalViews / Math.max(content.reactionCount, 1)), 10000),
-        "GlobalReact",
-      ),
-    ];
-  }
-}
-
-const previewTop10: HomePayload["top10"] = [
-  { rank: 1, contentSlug: "extreme-job", titleKo: "극한직업", categorySlug: "movie", categoryNameKo: "영화", reactionCount: 47, totalViews: 2100000, thumbnailUrl: null },
-  { rank: 2, contentSlug: "new-journey-to-the-west", titleKo: "신서유기", categorySlug: "drama", categoryNameKo: "드라마", reactionCount: 33, totalViews: 1800000, thumbnailUrl: null },
-  { rank: 3, contentSlug: "apt", titleKo: "APT.", categorySlug: "music", categoryNameKo: "노래", reactionCount: 91, totalViews: 5400000, thumbnailUrl: null },
-  { rank: 4, contentSlug: "solo-leveling", titleKo: "나 혼자만 레벨업", categorySlug: "webtoon", categoryNameKo: "만화", reactionCount: 28, totalViews: 1600000, thumbnailUrl: null },
-  { rank: 5, contentSlug: "parasite", titleKo: "기생충", categorySlug: "movie", categoryNameKo: "영화", reactionCount: 62, totalViews: 3200000, thumbnailUrl: null },
-  { rank: 6, contentSlug: "squid-game-2", titleKo: "오징어게임 S2", categorySlug: "drama", categoryNameKo: "드라마", reactionCount: 110, totalViews: 6100000, thumbnailUrl: null },
-  { rank: 7, contentSlug: "guardian", titleKo: "도깨비", categorySlug: "drama", categoryNameKo: "드라마", reactionCount: 38, totalViews: 2900000, thumbnailUrl: null },
-  { rank: 8, contentSlug: "bokmyeon-song", titleKo: "복면가왕 레전드 무대", categorySlug: "music", categoryNameKo: "노래", reactionCount: 22, totalViews: 1200000, thumbnailUrl: null },
-];
+const previewTop10: HomePayload["top10"] = previewContents
+  .slice()
+  .sort((left, right) => right.totalViews - left.totalViews || right.reactionCount - left.reactionCount)
+  .map((content, index) => ({
+    rank: index + 1,
+    contentSlug: content.slug,
+    titleKo: content.titleKo,
+    categorySlug: content.categorySlug,
+    categoryNameKo: content.categoryNameKo,
+    reactionCount: content.reactionCount,
+    totalViews: content.totalViews,
+    thumbnailUrl: content.thumbnailUrl,
+  }));
 
 const previewHome: HomePayload = {
   siteCopy: {
-    brandName: "어썸코리아",
+    brandName: "AwesomeKorea",
     brandTagline: "Awesome Korea - 해외 반응 모음",
-    heroBadge: "관리자 추천",
-    heroToolbarCopy: "운영자가 직접 고른 해외 유튜브 반응을 메인에서 빠르게 살펴보세요.",
-    heroTitle: "지금 소개할 대표 반응을 운영자가 직접 편성합니다.",
-    heroDescription:
-      "대문 문구, 카테고리, 유튜브 제목과 소개글, 메인 대표 반응까지 모두 관리자에서 조정할 수 있습니다.",
+    heroBadge: "운영 우선 편성",
+    heroToolbarCopy: "편성 슬롯과 우선순위 점수를 조합해 홈 노출 순서를 운영합니다.",
+    heroTitle: "운영자가 직접 고른 해외 반응을 먼저 보여드립니다.",
+    heroDescription: "요구사항 3 기준으로 게임 카테고리와 콜 오브 듀티 우선 편성을 반영한 예시입니다.",
   },
   hero: {
-    contentSlug: "extreme-job",
-    titleKo: "극한직업",
-    categoryNameKo: "영화",
-    reactionCount: 47,
-    message: "오늘 가장 많이 본 반응 콘텐츠",
+    contentSlug: "call-of-duty-modern-warfare-4",
+    titleKo: "콜 오브 듀티: 모던 워페어 4",
+    categoryNameKo: "게임",
+    reactionCount: 18,
+    message: "2026년 10월 출시 예정 기준 우선 편성 콘텐츠",
+    releaseDate: "2026-10",
   },
+  featuredContents: [
+    {
+      slotCode: "home.featured.contents",
+      headline: "운영 우선 콘텐츠",
+      body: "게임 카테고리 오픈과 함께 대표 콘텐츠를 홈 추천 영역에 고정합니다.",
+      content: previewContentMap.get("call-of-duty-modern-warfare-4")!,
+    },
+    {
+      slotCode: "home.featured.contents",
+      headline: "트렌드 반응 묶음",
+      body: "글로벌 주목도가 높은 드라마도 함께 추천 영역에 배치합니다.",
+      content: previewContentMap.get("squid-game-2")!,
+    },
+  ],
   featuredReactions: [
     {
       sortOrder: 1,
-      contentSlug: "extreme-job",
-      contentTitle: "극한직업",
-      categorySlug: "movie",
-      categoryNameKo: "영화",
-      reactionCount: 47,
-      totalViews: 2100000,
-      reaction: previewReactions["extreme-job"]![0]!,
+      contentSlug: "call-of-duty-modern-warfare-4",
+      contentTitle: "콜 오브 듀티: 모던 워페어 4",
+      categorySlug: "game",
+      categoryNameKo: "게임",
+      reactionCount: 18,
+      totalViews: 980000,
+      reaction: previewReactions["call-of-duty-modern-warfare-4"]![0]!,
     },
     {
       sortOrder: 2,
       contentSlug: "squid-game-2",
-      contentTitle: "오징어게임 S2",
+      contentTitle: "오징어 게임 시즌 2",
       categorySlug: "drama",
       categoryNameKo: "드라마",
       reactionCount: 110,
@@ -448,57 +324,127 @@ const previewHome: HomePayload = {
     {
       categorySlug: "all",
       categoryNameKo: "전체",
-      items: previewContents.slice(0, 8),
+      items: previewContents
+        .slice()
+        .sort((left, right) => right.priorityScore - left.priorityScore || right.totalViews - left.totalViews),
     },
-    {
-      categorySlug: "movie",
-      categoryNameKo: "영화",
-      items: previewContents.filter((item) => item.categorySlug === "movie"),
-    },
-    {
-      categorySlug: "drama",
-      categoryNameKo: "드라마",
-      items: previewContents.filter((item) => item.categorySlug === "drama"),
-    },
-    {
-      categorySlug: "webtoon",
-      categoryNameKo: "만화",
-      items: previewContents.filter((item) => item.categorySlug === "webtoon"),
-    },
-    {
-      categorySlug: "music",
-      categoryNameKo: "노래",
-      items: previewContents.filter((item) => item.categorySlug === "music"),
-    },
+    ...previewCategories.map((category) => ({
+      categorySlug: category.slug,
+      categoryNameKo: category.nameKo,
+      items: previewContents.filter((item) => item.categorySlug === category.slug),
+    })),
   ],
-  updatedAt: "2026-05-30T08:00:00.000Z",
+  updatedAt: "2026-06-02T09:00:00.000Z",
+};
+
+const previewComments: Record<string, ReactionCommentsPayload> = {
+  codmw4rx01a: {
+    locale: "ko",
+    videoId: "codmw4rx01a",
+    status: "ok",
+    order: "relevance",
+    strategy: "topN",
+    fetchedAll: false,
+    pageSize: 20,
+    fetchedCount: 2,
+    totalCommentCount: 840,
+    estimatedQuotaUnits: 1,
+    message: "우선 편성 콘텐츠의 대표 댓글을 먼저 번역해 보여주는 예시입니다.",
+    items: [
+      {
+        id: "cod-comment-1",
+        authorDisplayName: "FPSFanWorld",
+        authorProfileImageUrl: null,
+        text: "캠페인 복귀 연출이 강해서 반응 영상도 빨리 늘어날 것 같아요.",
+        originalText: "The campaign comeback looks huge. Reaction uploads will explode.",
+        translationSource: "machine",
+        hasTranslation: true,
+        likeCount: 240,
+        publishedAt: "2026-06-02T08:20:00.000Z",
+        updatedAt: "2026-06-02T08:20:00.000Z",
+        replyCount: 1,
+        replies: [
+          {
+            id: "cod-comment-1-reply-1",
+            authorDisplayName: "ShooterNerd",
+            authorProfileImageUrl: null,
+            text: "멀티플레이 공개가 나오면 더 커질 것 같습니다.",
+            originalText: "It will get bigger once multiplayer footage drops.",
+            translationSource: "machine",
+            hasTranslation: true,
+            likeCount: 42,
+            publishedAt: "2026-06-02T08:31:00.000Z",
+          },
+        ],
+      },
+      {
+        id: "cod-comment-2",
+        authorDisplayName: "TrailerBreakdown",
+        authorProfileImageUrl: null,
+        text: "키워드 설정을 잘 하면 FPS 장르 반응까지 넓게 잡힐 것 같네요.",
+        originalText: "Good keyword coverage should catch broader FPS reaction videos too.",
+        translationSource: "machine",
+        hasTranslation: true,
+        likeCount: 119,
+        publishedAt: "2026-06-02T08:47:00.000Z",
+        updatedAt: "2026-06-02T08:47:00.000Z",
+        replyCount: 0,
+        replies: [],
+      },
+    ],
+  },
+};
+
+const previewReplies: Record<string, ReactionCommentRepliesPayload> = {
+  "codmw4rx01a:cod-comment-1": {
+    locale: "ko",
+    videoId: "codmw4rx01a",
+    commentId: "cod-comment-1",
+    status: "ok",
+    fetchedCount: 1,
+    estimatedQuotaUnits: 1,
+    message: "답글 번역 예시입니다.",
+    items: [
+      {
+        id: "cod-comment-1-reply-1",
+        authorDisplayName: "ShooterNerd",
+        authorProfileImageUrl: null,
+        text: "멀티플레이 공개가 나오면 더 커질 것 같습니다.",
+        originalText: "It will get bigger once multiplayer footage drops.",
+        translationSource: "machine",
+        hasTranslation: true,
+        likeCount: 42,
+        publishedAt: "2026-06-02T08:31:00.000Z",
+      },
+    ],
+  },
 };
 
 const sortContents = (items: ContentSummary[], sort: "popular" | "latest") =>
   [...items].sort((left, right) => {
     if (sort === "latest") {
       return (
-        String(right.latestReactionAt).localeCompare(String(left.latestReactionAt)) ||
-        right.totalViews - left.totalViews
+        left.priorityScore !== right.priorityScore
+          ? right.priorityScore - left.priorityScore
+          : String(right.latestReactionAt).localeCompare(String(left.latestReactionAt)) ||
+            right.totalViews - left.totalViews
       );
     }
 
-    return right.totalViews - left.totalViews || right.reactionCount - left.reactionCount;
+    return (
+      right.priorityScore - left.priorityScore ||
+      right.totalViews - left.totalViews ||
+      right.reactionCount - left.reactionCount
+    );
   });
 
 const sortReactions = (items: ReactionVideo[], sort: "popular" | "latest") =>
   [...items].sort((left, right) => {
     if (sort === "latest") {
-      return (
-        String(right.publishedAt).localeCompare(String(left.publishedAt)) ||
-        right.viewCount - left.viewCount
-      );
+      return String(right.publishedAt).localeCompare(String(left.publishedAt)) || right.viewCount - left.viewCount;
     }
 
-    return (
-      right.viewCount - left.viewCount ||
-      String(right.publishedAt).localeCompare(String(left.publishedAt))
-    );
+    return right.viewCount - left.viewCount || String(right.publishedAt).localeCompare(String(left.publishedAt));
   });
 
 const asPaginated = <T>(items: T[], page: number, limit: number): PaginatedResponse<T> => ({
@@ -528,20 +474,15 @@ export const getDevPreviewPayload = (requestPath: string) => {
     const page = Number(url.searchParams.get("page") ?? "1");
     const limit = Number(url.searchParams.get("limit") ?? "8");
     const filtered = previewContents.filter((item) => !category || item.categorySlug === category);
+
     return asPaginated(sortContents(filtered, sort), page, limit);
   }
 
   const detailMatch = url.pathname.match(/^\/api\/contents\/([^/]+)$/);
 
   if (detailMatch) {
-    const rawSlug = detailMatch[1];
-
-    if (!rawSlug) {
-      return null;
-    }
-
-    const slug = decodeURIComponent(rawSlug);
-    const content = previewContents.find((item) => item.slug === slug);
+    const slug = decodeURIComponent(detailMatch[1] ?? "");
+    const content = previewContentMap.get(slug);
 
     if (!content) {
       return null;
@@ -556,17 +497,11 @@ export const getDevPreviewPayload = (requestPath: string) => {
     return payload;
   }
 
-  const reactionMatch = url.pathname.match(/^\/api\/contents\/([^/]+)\/reactions$/);
+  const reactionsMatch = url.pathname.match(/^\/api\/contents\/([^/]+)\/reactions$/);
 
-  if (reactionMatch) {
-    const rawSlug = reactionMatch[1];
-
-    if (!rawSlug) {
-      return null;
-    }
-
-    const slug = decodeURIComponent(rawSlug);
-    const content = previewContents.find((item) => item.slug === slug);
+  if (reactionsMatch) {
+    const slug = decodeURIComponent(reactionsMatch[1] ?? "");
+    const content = previewContentMap.get(slug);
 
     if (!content) {
       return null;
@@ -591,53 +526,47 @@ export const getDevPreviewPayload = (requestPath: string) => {
     return payload;
   }
 
-  const commentMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments$/);
+  const repliesMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments\/([^/]+)\/replies$/);
 
-  const replyMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments\/([^/]+)\/replies$/);
-
-  if (replyMatch) {
-    const rawVideoId = replyMatch[1];
-    const rawCommentId = replyMatch[2];
-
-    if (!rawVideoId || !rawCommentId) {
-      return null;
-    }
+  if (repliesMatch) {
+    const videoId = decodeURIComponent(repliesMatch[1] ?? "");
+    const commentId = decodeURIComponent(repliesMatch[2] ?? "");
 
     return (
-      previewReplies[`${decodeURIComponent(rawVideoId)}:${decodeURIComponent(rawCommentId)}`] ?? {
+      previewReplies[`${videoId}:${commentId}`] ?? {
         locale: "ko",
-        videoId: decodeURIComponent(rawVideoId),
-        commentId: decodeURIComponent(rawCommentId),
+        videoId,
+        commentId,
         status: "empty",
         fetchedCount: 0,
         estimatedQuotaUnits: 1,
-        message: "?꾩쭅 ?쒖떆???듦????놁뼱??",
+        message: "답글이 없습니다.",
         items: [],
       }
     );
   }
 
-  if (commentMatch) {
-    const rawVideoId = commentMatch[1];
+  const commentsMatch = url.pathname.match(/^\/api\/reactions\/([^/]+)\/comments$/);
 
-    if (!rawVideoId) {
-      return null;
-    }
+  if (commentsMatch) {
+    const videoId = decodeURIComponent(commentsMatch[1] ?? "");
 
-    return previewComments[decodeURIComponent(rawVideoId)] ?? {
-      locale: "ko",
-      videoId: decodeURIComponent(rawVideoId),
-      status: "empty",
-      order: "relevance",
-      strategy: "full",
-      fetchedAll: true,
-      pageSize: 20,
-      fetchedCount: 0,
-      totalCommentCount: 0,
-      estimatedQuotaUnits: 0,
-      message: "아직 표시할 댓글이 없어요.",
-      items: [],
-    };
+    return (
+      previewComments[videoId] ?? {
+        locale: "ko",
+        videoId,
+        status: "empty",
+        order: "relevance",
+        strategy: "full",
+        fetchedAll: true,
+        pageSize: 20,
+        fetchedCount: 0,
+        totalCommentCount: 0,
+        estimatedQuotaUnits: 0,
+        message: "표시할 댓글이 없습니다.",
+        items: [],
+      }
+    );
   }
 
   return null;

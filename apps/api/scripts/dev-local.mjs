@@ -10,9 +10,10 @@ const repoDir = path.resolve(appDir, "..", "..");
 const localApiPort = "9000";
 const localPersistPath = ".wrangler/state/v3";
 const wranglerPath = path.join(repoDir, "node_modules", "wrangler", "bin", "wrangler.js");
-const wranglerBaseArgs = [
+const wranglerMigrationArgs = [
   "d1",
-  "execute",
+  "migrations",
+  "apply",
   "awesome-korea",
   "--config",
   "wrangler.jsonc",
@@ -20,7 +21,16 @@ const wranglerBaseArgs = [
   "--persist-to",
   localPersistPath,
 ];
-const requiredTables = ["categories", "contents", "channels", "reaction_videos", "ranking_snapshots"];
+const wranglerBaseArgs = [
+  "d1",
+  "execute",
+  "awesome-korea",
+  "--config",
+  "wrangler.jsonc",
+  "--local",
+    "--persist-to",
+    localPersistPath,
+];
 
 const runWrangler = (args, options = {}) => {
   const result = spawnSync(process.execPath, [wranglerPath, ...args], {
@@ -65,18 +75,8 @@ const { source } = syncLocalDevVars();
 log(`YOUTUBE_API_KEY 를 ${source} 기준으로 .dev.vars 에 동기화했습니다.`);
 
 const ensureLocalDatabase = () => {
-  const schemaCount = readScalar(
-    `SELECT COUNT(*) AS total
-     FROM sqlite_master
-     WHERE type = 'table'
-       AND name IN (${requiredTables.map((name) => `'${name}'`).join(", ")})`,
-    "total",
-  );
-
-  if (schemaCount < requiredTables.length) {
-    log("로컬 D1 스키마를 적용합니다.");
-    runWrangler([...wranglerBaseArgs, "--file", "./migrations/0001_initial.sql"]);
-  }
+  log("로컬 D1 마이그레이션을 확인합니다.");
+  runWrangler(wranglerMigrationArgs);
 
   const contentCount = readScalar("SELECT COUNT(*) AS total FROM contents", "total");
 

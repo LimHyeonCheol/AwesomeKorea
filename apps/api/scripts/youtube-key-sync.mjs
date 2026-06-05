@@ -186,6 +186,69 @@ export const loadInternalApiToken = () => {
   };
 };
 
+export const loadAdminSessionSecret = () => {
+  const envSecret = process.env.ADMIN_SESSION_SECRET?.trim();
+
+  if (envSecret) {
+    return {
+      secret: envSecret,
+      source: "process.env.ADMIN_SESSION_SECRET",
+    };
+  }
+
+  const currentContent = fs.existsSync(DEV_VARS_PATH) ? fs.readFileSync(DEV_VARS_PATH, "utf8") : "";
+  const existingSecret = readEnvVar(currentContent, "ADMIN_SESSION_SECRET");
+
+  if (existingSecret) {
+    return {
+      secret: existingSecret,
+      source: path.relative(repoDir, DEV_VARS_PATH) || DEV_VARS_PATH,
+    };
+  }
+
+  const generatedSecret = randomBytes(32).toString("base64url");
+  const nextContent = upsertEnvVar(currentContent, "ADMIN_SESSION_SECRET", generatedSecret);
+
+  fs.writeFileSync(DEV_VARS_PATH, nextContent, "utf8");
+
+  return {
+    secret: generatedSecret,
+    source: `generated:${path.relative(repoDir, DEV_VARS_PATH) || DEV_VARS_PATH}`,
+  };
+};
+
+export const loadAdminAllowedOrigins = () => {
+  const envOrigins = process.env.ADMIN_ALLOWED_ORIGINS?.trim();
+
+  if (envOrigins) {
+    return {
+      source: "process.env.ADMIN_ALLOWED_ORIGINS",
+      value: envOrigins,
+    };
+  }
+
+  const currentContent = fs.existsSync(DEV_VARS_PATH) ? fs.readFileSync(DEV_VARS_PATH, "utf8") : "";
+  const existingOrigins = readEnvVar(currentContent, "ADMIN_ALLOWED_ORIGINS");
+
+  if (existingOrigins) {
+    return {
+      source: path.relative(repoDir, DEV_VARS_PATH) || DEV_VARS_PATH,
+      value: existingOrigins,
+    };
+  }
+
+  const pagesProject = process.env.AWESOMEKOREA_PAGES_PROJECT?.trim();
+
+  if (pagesProject) {
+    return {
+      source: "derived:AWESOMEKOREA_PAGES_PROJECT",
+      value: `https://${pagesProject}.pages.dev`,
+    };
+  }
+
+  return null;
+};
+
 const putCloudflareSecret = (key, value) => {
   const result = spawnSync(
     process.execPath,
@@ -219,7 +282,32 @@ export const syncInternalApiTokenSecret = () => {
 
   return {
     source,
+  };
+};
+
+export const syncAdminSessionSecret = () => {
+  const { secret, source } = loadAdminSessionSecret();
+
+  putCloudflareSecret("ADMIN_SESSION_SECRET", secret);
+
+  return {
+    source,
+  };
+};
+
+export const syncAdminAllowedOriginsSecret = () => {
+  const loaded = loadAdminAllowedOrigins();
+
+  if (!loaded) {
+    return null;
   }
+
+  putCloudflareSecret("ADMIN_ALLOWED_ORIGINS", loaded.value);
+
+  return {
+    source: loaded.source,
+    value: loaded.value,
+  };
 };
 
 const loadOptionalEnvVar = (key) => {

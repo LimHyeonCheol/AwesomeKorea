@@ -265,3 +265,13 @@ export interface AdminDashboardPayload {
   featuredReactions: AdminReactionVideo[];
   reactions: AdminReactionVideo[];
 }
+
+export interface AdminProfile {
+  loginId: string;
+  displayName: string;
+}
+
+export interface AdminSessionPayload {
+  ok: boolean;
+  admin: AdminProfile;
+}

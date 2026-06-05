@@ -1,13 +1,15 @@
 import type {
   AdminDashboardPayload,
+  AdminProfile,
+  AdminSessionPayload,
   Category,
   CategoryFilter,
-  ReactionCommentRepliesPayload,
   ContentDetailPayload,
   ContentStatus,
   ContentSummary,
   HomePayload,
   PaginatedResponse,
+  ReactionCommentRepliesPayload,
   ReactionCommentsPayload,
   ReactionListPayload,
   SortOrder,
@@ -18,6 +20,19 @@ import { getDevPreviewPayload } from "./dev-preview";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const DEV_PREVIEW_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_PREVIEW === "true";
+
+export class ApiRequestError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
+export const isApiRequestError = (error: unknown, status?: number): error is ApiRequestError =>
+  error instanceof ApiRequestError && (status === undefined || error.status === status);
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const searchParams = new URLSearchParams();
@@ -37,6 +52,7 @@ const request = async <T>(
   path: string,
   options: {
     body?: unknown;
+    credentials?: RequestCredentials;
     headers?: Record<string, string>;
     method?: string;
   } = {},
@@ -44,6 +60,7 @@ const request = async <T>(
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? "GET",
+      credentials: options.credentials ?? "same-origin",
       headers: {
         ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...options.headers,
@@ -53,17 +70,16 @@ const request = async <T>(
 
     if (!response.ok) {
       const fallback = "요청을 처리하지 못했습니다.";
+      let message = fallback;
 
       try {
         const payload = (await response.json()) as { message?: string };
-        throw new Error(payload.message ?? fallback);
-      } catch (error) {
-        if (error instanceof Error) {
-          throw error;
-        }
-
-        throw new Error(fallback);
+        message = payload.message ?? fallback;
+      } catch {
+        message = fallback;
       }
+
+      throw new ApiRequestError(response.status, message);
     }
 
     return (await response.json()) as T;
@@ -121,54 +137,26 @@ export const apiClient = {
         limit,
       })}`,
     ),
-  getAdminDashboard: (token: string | null) =>
+  getAdminDashboard: () =>
     request<AdminDashboardPayload>("/api/admin/dashboard", {
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
+      credentials: "include",
     }),
-  saveAdminHomeSettings: (
-    token: string | null,
-    payload: {
-      brandName: string;
-      brandTagline: string;
-      heroBadge: string;
-      heroToolbarCopy: string;
-      heroTitle: string;
-      heroDescription: string;
-    },
-  ) =>
-    request<{ ok: boolean; settings: AdminDashboardPayload["settings"] }>("/api/admin/settings/home", {
-      method: "PUT",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
-      body: payload,
+  getAdminSession: () =>
+    request<AdminSessionPayload>("/api/admin/me", {
+      credentials: "include",
     }),
-  createAdminCategory: (
-    token: string | null,
-    payload: {
-      slug: string;
-      nameKo: string;
-      sortOrder: number;
-      isActive: boolean;
-    },
-  ) =>
-    request<{ ok: boolean }>("/api/admin/categories", {
+  loginAdmin: (payload: { loginId: string; password: string }) =>
+    request<AdminSessionPayload>("/api/admin/login", {
       method: "POST",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
+      credentials: "include",
       body: payload,
+    }),
+  logoutAdmin: () =>
+    request<{ ok: boolean }>("/api/admin/logout", {
+      method: "POST",
+      credentials: "include",
     }),
   updateAdminCategory: (
-    token: string | null,
     categoryId: number,
     payload: {
       slug: string;
@@ -177,44 +165,12 @@ export const apiClient = {
       isActive: boolean;
     },
   ) =>
-    request<{ ok: boolean }>(`/api/admin/categories/${categoryId}`, {
+    request<{ id: number; ok: boolean }>(`/api/admin/categories/${categoryId}`, {
       method: "PUT",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
-      body: payload,
-    }),
-  createAdminContent: (
-    token: string | null,
-    payload: {
-      categoryId: number;
-      slug: string;
-      titleKo: string;
-      titleEn: string | null;
-      aliases: string[];
-      releaseYear: number | null;
-      releaseDate: string | null;
-      thumbnailUrl: string | null;
-      description: string | null;
-      searchKeywords: string[];
-      priorityScore: number;
-      heroMessageKo: string | null;
-      status: ContentStatus;
-    },
-  ) =>
-    request<{ ok: boolean }>("/api/admin/contents", {
-      method: "POST",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
+      credentials: "include",
       body: payload,
     }),
   updateAdminContent: (
-    token: string | null,
     contentId: number,
     payload: {
       categoryId: number;
@@ -232,17 +188,12 @@ export const apiClient = {
       status: ContentStatus;
     },
   ) =>
-    request<{ ok: boolean }>(`/api/admin/contents/${contentId}`, {
+    request<{ id: number; ok: boolean }>(`/api/admin/contents/${contentId}`, {
       method: "PUT",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
+      credentials: "include",
       body: payload,
     }),
   updateAdminReaction: (
-    token: string | null,
     youtubeVideoId: string,
     payload: {
       adminTitle: string | null;
@@ -251,13 +202,14 @@ export const apiClient = {
       featuredOrder: number;
     },
   ) =>
-    request<{ ok: boolean }>(`/api/admin/reactions/${encodeURIComponent(youtubeVideoId)}`, {
-      method: "PUT",
-      headers: token
-        ? {
-            Authorization: `Bearer ${token}`,
-          }
-        : {},
-      body: payload,
-    }),
+    request<{ ok: boolean; youtubeVideoId: string }>(
+      `/api/admin/reactions/${encodeURIComponent(youtubeVideoId)}`,
+      {
+        method: "PUT",
+        credentials: "include",
+        body: payload,
+      },
+    ),
 };
+
+export type { AdminProfile };

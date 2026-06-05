@@ -165,6 +165,8 @@ const normalizeSearchKeywords = (keywords: string[]) =>
     ),
   );
 
+const wasRowAffected = (result: D1Result) => Number(result.meta.changes ?? 0) > 0;
+
 export const getAdminCategories = async (db: D1Database): Promise<Category[]> => {
   const result = await db
     .prepare(
@@ -218,8 +220,8 @@ export const updateAdminCategory = async (
     slug: string;
     sortOrder: number;
   },
-): Promise<void> => {
-  await db
+): Promise<boolean> => {
+  const result = await db
     .prepare(
       `
         UPDATE categories
@@ -233,6 +235,8 @@ export const updateAdminCategory = async (
     )
     .bind(input.slug, input.nameKo, input.sortOrder, input.isActive ? 1 : 0, categoryId)
     .run();
+
+  return wasRowAffected(result);
 };
 
 export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> => {
@@ -366,8 +370,8 @@ export const updateAdminContent = async (
     titleEn: string | null;
     titleKo: string;
   },
-): Promise<void> => {
-  await db
+): Promise<boolean> => {
+  const result = await db
     .prepare(
       `
         UPDATE contents
@@ -406,6 +410,8 @@ export const updateAdminContent = async (
       contentId,
     )
     .run();
+
+  return wasRowAffected(result);
 };
 
 export const getAdminReactions = async (
@@ -484,8 +490,8 @@ export const updateAdminReaction = async (
     featuredOrder: number;
     isFeatured: boolean;
   },
-): Promise<void> => {
-  await db
+): Promise<boolean> => {
+  const result = await db
     .prepare(
       `
         UPDATE reaction_videos
@@ -506,6 +512,8 @@ export const updateAdminReaction = async (
       youtubeVideoId,
     )
     .run();
+
+  return wasRowAffected(result);
 };
 
 export const getAdminDashboard = async (db: D1Database): Promise<AdminDashboardPayload> => {

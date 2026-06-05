@@ -1,7 +1,8 @@
 ﻿import { Hono } from "hono";
 import { cors } from "hono/cors";
+import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { ContentStatus, HomeSiteCopy } from "@awesomekorea/shared";
+import type { AdminSessionPayload, ContentStatus, HomeSiteCopy } from "@awesomekorea/shared";
 
 import { clampLimit, clampPage, parseSort } from "./lib/pagination";
 import {
@@ -13,6 +14,7 @@ import {
   updateAdminContent,
   updateAdminReaction,
 } from "./repositories/admin-repository";
+import { getAdminUserByLoginId } from "./repositories/admin-auth-repository";
 import {
   getCategories,
   getContentBySlug,
@@ -24,6 +26,13 @@ import {
 } from "./repositories/catalog-repository";
 import { bumpCacheVersion, withCache } from "./services/cache-service";
 import { ensureBootstrapContentData } from "./services/bootstrap-service";
+import {
+  assertAllowedAdminOrigin,
+  clearAdminSession,
+  createAdminSession,
+  requireAdminSession,
+  verifyAdminPassword,
+} from "./services/admin-auth-service";
 import { rebuildRankings } from "./services/ranking-service";
 import {
   createUnavailableCommentsPayload,
@@ -37,7 +46,15 @@ import type { AppBindings } from "./types";
 
 const app = new Hono<AppBindings>();
 
-app.use("/api/*", cors());
+app.use(
+  "/api/*",
+  cors({
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["GET", "POST", "PUT", "OPTIONS"],
+    credentials: true,
+    origin: (origin) => origin || "*",
+  }),
+);
 
 const applySecurityHeaders = (headers: Headers) => {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -100,6 +117,13 @@ const assertInternalToken = (c: {
     });
   }
 };
+
+const loadAdminProfile = async (
+  c: Context<AppBindings>,
+) =>
+  requireAdminSession(c, async (loginId) =>
+    getAdminUserByLoginId(c.env.DB, loginId),
+  );
 
 const buildContentListCacheKey = (
   category: string | undefined,
@@ -524,8 +548,59 @@ app.get("/api/reactions/:youtubeVideoId/comments/:commentId/replies", async (c) 
   }
 });
 
+app.post("/api/admin/login", async (c) => {
+  assertAllowedAdminOrigin(c);
+  c.header("Cache-Control", "no-store");
+
+  const payload = await readJsonBody(c);
+  const loginId = requireStringField(payload.loginId, "아이디");
+  const password = requireStringField(payload.password, "비밀번호");
+  const adminUser = await getAdminUserByLoginId(c.env.DB, loginId);
+
+  if (!adminUser || !adminUser.isActive || !verifyAdminPassword(password, adminUser.passwordHash)) {
+    throw new HTTPException(401, {
+      message: "아이디 또는 비밀번호가 올바르지 않습니다.",
+    });
+  }
+
+  await createAdminSession(c, adminUser);
+
+  const responsePayload: AdminSessionPayload = {
+    ok: true,
+    admin: {
+      loginId: adminUser.loginId,
+      displayName: adminUser.displayName,
+    },
+  };
+
+  return c.json(responsePayload);
+});
+
+app.get("/api/admin/me", async (c) => {
+  c.header("Cache-Control", "no-store");
+
+  const admin = await loadAdminProfile(c);
+
+  const responsePayload: AdminSessionPayload = {
+    ok: true,
+    admin,
+  };
+
+  return c.json(responsePayload);
+});
+
+app.post("/api/admin/logout", async (c) => {
+  assertAllowedAdminOrigin(c);
+  c.header("Cache-Control", "no-store");
+  clearAdminSession(c);
+
+  return c.json({
+    ok: true,
+  });
+});
+
 app.get("/api/admin/dashboard", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
   await ensureBootstrapContentData(c.env);
 
@@ -534,7 +609,7 @@ app.get("/api/admin/dashboard", async (c) => {
 });
 
 app.put("/api/admin/settings/home", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
   const payload = parseHomeSettingsPayload(await readJsonBody(c));
@@ -548,7 +623,7 @@ app.put("/api/admin/settings/home", async (c) => {
 });
 
 app.post("/api/admin/categories", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
   const payload = parseCategoryPayload(await readJsonBody(c));
@@ -561,23 +636,31 @@ app.post("/api/admin/categories", async (c) => {
 });
 
 app.put("/api/admin/categories/:id", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
-  const categoryId = parseIntegerField(c.req.param("id"), "移댄뀒怨좊━ ID", {
+  const categoryId = parseIntegerField(c.req.param("id"), "카테고리 ID", {
     min: 1,
   }) as number;
   const payload = parseCategoryPayload(await readJsonBody(c));
-  await updateAdminCategory(c.env.DB, categoryId, payload);
+  const updated = await updateAdminCategory(c.env.DB, categoryId, payload);
+
+  if (!updated) {
+    throw new HTTPException(404, {
+      message: "수정할 카테고리를 찾을 수 없습니다.",
+    });
+  }
+
   await bumpCacheVersion(c.env.CONTENT_CACHE);
 
   return c.json({
     ok: true,
+    id: categoryId,
   });
 });
 
 app.post("/api/admin/contents", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
   const payload = parseContentPayload(await readJsonBody(c));
@@ -590,39 +673,55 @@ app.post("/api/admin/contents", async (c) => {
 });
 
 app.put("/api/admin/contents/:id", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
-  const contentId = parseIntegerField(c.req.param("id"), "肄섑뀗痢?ID", {
+  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
     min: 1,
   }) as number;
   const payload = parseContentPayload(await readJsonBody(c));
-  await updateAdminContent(c.env.DB, contentId, payload);
+  const updated = await updateAdminContent(c.env.DB, contentId, payload);
+
+  if (!updated) {
+    throw new HTTPException(404, {
+      message: "수정할 콘텐츠를 찾을 수 없습니다.",
+    });
+  }
+
   await bumpCacheVersion(c.env.CONTENT_CACHE);
 
   return c.json({
     ok: true,
+    id: contentId,
   });
 });
 
 app.put("/api/admin/reactions/:youtubeVideoId", async (c) => {
-  assertInternalToken(c);
+  await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
   const youtubeVideoId = c.req.param("youtubeVideoId");
 
   if (!youtubeVideoId) {
     throw new HTTPException(400, {
-      message: "?좏뒠釉??곸긽 ID媛 ?꾩슂?⑸땲??",
+      message: "유튜브 영상 ID가 필요합니다.",
     });
   }
 
   const payload = parseReactionPayload(await readJsonBody(c));
-  await updateAdminReaction(c.env.DB, youtubeVideoId, payload);
+  const updated = await updateAdminReaction(c.env.DB, youtubeVideoId, payload);
+
+  if (!updated) {
+    throw new HTTPException(404, {
+      message: "수정할 리액션 영상을 찾을 수 없습니다.",
+    });
+  }
+
   await bumpCacheVersion(c.env.CONTENT_CACHE);
 
   return c.json({
     ok: true,
+    youtubeVideoId,
   });
 });
 

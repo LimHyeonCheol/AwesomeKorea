@@ -2,6 +2,13 @@
 
 ## 변경 이력
 
+### v0.1.3 (2026-06-06)
+
+- `/admin`을 브라우저 토큰 입력 방식에서 `관리자 로그인 + HTTP-only 세션 쿠키` 방식으로 리팩토링했습니다.
+- 어드민 화면을 `카테고리 수정`, `콘텐츠 수정`, `리액션 수정`의 수정 전용 3개 섹션으로 단순화하고, 생성 UI를 제거했습니다.
+- `/api/admin/*`는 세션 인증으로 분리하고, `/internal/*`만 `INTERNAL_API_TOKEN`을 유지하도록 관리자 인증과 내부 배치 인증을 분리했습니다.
+- `admin_users` 마이그레이션, 로컬/배포용 `ADMIN_SESSION_SECRET` 동기화, `ADMIN_ALLOWED_ORIGINS` 배포 설정을 추가했습니다.
+
 ### v0.1.2 (2026-06-02)
 
 - `game` 카테고리와 `콜 오브 듀티: 모던 워페어 4` 우선 편성 데이터를 추가하고, 홈/카테고리/상세 화면에서 우선 노출 규칙을 반영했습니다.
@@ -82,7 +89,7 @@
 
 ### 제외
 
-- 관리자 웹 콘솔
+- 고도화된 관리자 CMS
 - 회원가입/로그인
 - 개인화 추천
 - 다국어 UI
@@ -206,14 +213,64 @@ npm run dev:web
 
 개발 중에는 `apps/web/vite.config.ts` 프록시 설정으로 `/api`, `/internal` 요청이 `http://127.0.0.1:9000`로 전달됩니다.
 
+### 5. 어드민 로그인 테스트
+
+기본 관리자 계정은 아래 값으로 시드됩니다.
+
+- `id`: `admin`
+- `pw`: `dlaguscjfWkd`
+
+로컬 테스트 순서:
+
+1. `npm run db:migrate:local`
+2. `npm run db:seed:local`
+3. `npm run dev:api`
+4. `npm run dev:web`
+5. 브라우저에서 `http://127.0.0.1:5173/admin` 접속
+6. `admin / dlaguscjfWkd` 로그인
+7. 카테고리, 콘텐츠, 리액션 카드에서 저장 버튼으로 수정 확인
+
+어드민 화면 동작 방식:
+
+- `/admin` 진입 시 프런트가 `GET /api/admin/me`로 세션을 확인합니다.
+- 세션이 없으면 로그인 폼만 노출되고, 로그인 시 `POST /api/admin/login`으로 HTTP-only 쿠키를 발급받습니다.
+- 로그인 후에는 `GET /api/admin/dashboard`로 수정 대상 데이터를 불러옵니다.
+- 저장은 아래 수정 전용 엔드포인트를 사용합니다.
+  - `PUT /api/admin/categories/:id`
+  - `PUT /api/admin/contents/:id`
+  - `PUT /api/admin/reactions/:youtubeVideoId`
+- 로그아웃은 `POST /api/admin/logout`으로 처리합니다.
+- 내부 배치 엔드포인트인 `/internal/*`는 계속 `INTERNAL_API_TOKEN` 기반입니다.
+
+수동 API 테스트 예시:
+
+```bash
+curl -i -c admin-cookie.txt -X POST http://127.0.0.1:9000/api/admin/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"loginId\":\"admin\",\"password\":\"dlaguscjfWkd\"}"
+
+curl -b admin-cookie.txt http://127.0.0.1:9000/api/admin/me
+curl -b admin-cookie.txt http://127.0.0.1:9000/api/admin/dashboard
+curl -i -b admin-cookie.txt -X PUT http://127.0.0.1:9000/api/admin/categories/9999 ^
+  -H "Content-Type: application/json" ^
+  -d "{\"slug\":\"ghost\",\"nameKo\":\"고스트\",\"sortOrder\":99,\"isActive\":false}"
+```
+
+마지막 예시는 존재하지 않는 대상을 수정할 때 `404`가 반환되는지 확인하는 용도입니다.
+
 ## 환경 변수
 
 `apps/api/.dev.vars.example`를 참고해 아래 값을 준비합니다.
 
 - `YOUTUBE_API_KEY`
 - `INTERNAL_API_TOKEN`
+- `ADMIN_SESSION_SECRET`
+- 선택: `ADMIN_ALLOWED_ORIGINS`
 
 로컬 개발은 `npm run dev:api` 또는 `npm run sync:api-key` 실행 시 `docs/apikey.txt`, `apikey.txt`, `YOUTUBE_API_KEY_FILE`, `YOUTUBE_API_KEY` 순서로 값을 찾아 `apps/api/.dev.vars`에 자동 반영합니다.
+
+`ADMIN_SESSION_SECRET`은 비어 있으면 로컬에서는 개발용 기본값으로 동작하지만, 운영/배포에서는 고정 secret 등록을 권장합니다.  
+`ADMIN_ALLOWED_ORIGINS`는 `VITE_API_BASE_URL`로 별도 Worker 도메인을 사용하는 경우 필요한 관리자 허용 origin 목록입니다. 쉼표(`,`)로 여러 origin을 넣을 수 있습니다.
 
 API 배포는 `npm run deploy:api`로 진행하면 `YOUTUBE_API_KEY`를 Cloudflare Worker secret으로 먼저 동기화한 뒤 바로 `wrangler deploy`까지 이어집니다.
 
@@ -256,6 +313,15 @@ wrangler kv namespace create awesomekorea-content-cache
 - 기존 `apps/api/.dev.vars`
 - 미지정 시 배포 스크립트가 강한 랜덤 토큰을 생성해 `apps/api/.dev.vars`에 저장
 
+어드민 로그인용 값은 아래 기준으로 준비합니다.
+
+- `ADMIN_SESSION_SECRET`
+  - 미지정 시 배포 스크립트가 강한 랜덤 시크릿을 생성해 Worker secret으로 업로드
+  - 다만 배포마다 세션이 바뀌지 않도록 운영에서는 고정 secret 권장
+- 선택: `ADMIN_ALLOWED_ORIGINS`
+  - 미지정 시 `AWESOMEKOREA_PAGES_PROJECT`가 있으면 `https://<project>.pages.dev`를 기본 허용 origin으로 업로드
+  - 커스텀 도메인이나 별도 프론트 origin을 쓰면 직접 지정 권장
+
 그 다음 API를 배포합니다.
 
 ```bash
@@ -267,6 +333,8 @@ npm run deploy:api
 - 로컬 `YOUTUBE_API_KEY` 동기화
 - Worker secret `YOUTUBE_API_KEY` 업로드
 - Worker secret `INTERNAL_API_TOKEN` 업로드
+- Worker secret `ADMIN_SESSION_SECRET` 업로드
+- 선택: Worker secret `ADMIN_ALLOWED_ORIGINS` 업로드
 - `.wrangler/deploy.production.jsonc` 임시 설정 생성
 - `APP_ENV=production` 기준 Worker 배포
 
@@ -322,9 +390,13 @@ npm run deploy:web
 - `CLOUDFLARE_KV_ID`
 - `YOUTUBE_API_KEY`
 - 선택: `INTERNAL_API_TOKEN`
+- 권장: `ADMIN_SESSION_SECRET`
+- 선택: `ADMIN_ALLOWED_ORIGINS`
 
 `INTERNAL_API_TOKEN` 을 비워두면 배포 워크플로가 실행 중 임시 토큰을 생성해 Worker secret으로 업로드합니다.  
 다만 운영 안정성을 위해서는 고정값 secret 등록을 권장합니다.
+
+`ADMIN_SESSION_SECRET`도 비워둘 수는 있지만, 이 경우 배포 시 새 시크릿이 생성되어 기존 로그인 세션이 유지되지 않을 수 있습니다.
 
 ### GitHub Variables
 
@@ -340,6 +412,9 @@ npm run deploy:web
   - 기본값: `main`
 - `AWESOMEKOREA_WORKER_URL`
   - 기본값: `https://awesomekorea-api.awesomekorea-limhyeoncheol.workers.dev`
+- 선택: `ADMIN_ALLOWED_ORIGINS`
+  - 예시: `https://awesomekorea-web.pages.dev`
+  - 지정하지 않으면 배포 스크립트가 `AWESOMEKOREA_PAGES_PROJECT` 기준 `pages.dev` origin을 기본값으로 사용
 
 ### 동작 방식
 

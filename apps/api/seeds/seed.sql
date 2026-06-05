@@ -1,3 +1,4 @@
+DELETE FROM admin_users;
 DELETE FROM editorial_entries;
 DELETE FROM editorial_slots;
 DELETE FROM app_settings;
@@ -424,3 +425,21 @@ INSERT INTO editorial_entries (
     '2026-06-02T09:00:00.000Z',
     '2026-06-02T09:00:00.000Z'
   );
+
+INSERT INTO admin_users (
+  id,
+  login_id,
+  password_hash,
+  display_name,
+  is_active,
+  created_at,
+  updated_at
+) VALUES (
+  1,
+  'admin',
+  'scrypt$9f7b4c2d8a1133557799aabbccddeeff$1afa040b9148cb81baac05326329750c0ba59f90a62cc40b680f13431668b509ef246fa7524703b07760abf8c1b77a642b9b636fa19d7ec042308627d32ff635',
+  '관리자',
+  1,
+  '2026-06-02T09:00:00.000Z',
+  '2026-06-02T09:00:00.000Z'
+);

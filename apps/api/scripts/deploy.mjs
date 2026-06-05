@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 
 import {
   appDir,
+  syncAdminAllowedOriginsSecret,
+  syncAdminSessionSecret,
   syncInternalApiTokenSecret,
   syncOptionalTranslationSecrets,
   syncCloudflareSecret,
@@ -18,6 +20,8 @@ console.log("[deploy:api] Cloudflare Worker secret 을 동기화합니다.");
 
 const youtubeSecret = syncCloudflareSecret();
 const internalTokenSecret = syncInternalApiTokenSecret();
+const adminSessionSecret = syncAdminSessionSecret();
+const adminAllowedOrigins = syncAdminAllowedOriginsSecret();
 const translationSecrets = syncOptionalTranslationSecrets();
 const { configPath } = buildProductionConfig();
 
@@ -38,6 +42,18 @@ console.log(`[deploy:api] YOUTUBE_API_KEY secret 동기화 완료. (source: ${yo
 console.log(
   `[deploy:api] INTERNAL_API_TOKEN secret 동기화 완료. (source: ${internalTokenSecret.source})`,
 );
+console.log(
+  `[deploy:api] ADMIN_SESSION_SECRET secret 동기화 완료. (source: ${adminSessionSecret.source})`,
+);
+if (adminAllowedOrigins) {
+  console.log(
+    `[deploy:api] ADMIN_ALLOWED_ORIGINS 동기화 완료. (${adminAllowedOrigins.value})`,
+  );
+} else {
+  console.log(
+    "[deploy:api] ADMIN_ALLOWED_ORIGINS 가 비어 있습니다. same-origin 또는 로컬 개발 origin 만 관리자 접근이 허용됩니다.",
+  );
+}
 console.log(
   `[deploy:api] Cloudflare 프로덕션 설정 파일 생성 완료. (${path.relative(appDir, configPath)})`,
 );

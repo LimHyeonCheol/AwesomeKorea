@@ -1,5 +1,7 @@
 export interface AppBindings {
   Bindings: {
+    ADMIN_ALLOWED_ORIGINS?: string;
+    ADMIN_SESSION_SECRET?: string;
     APP_ENV?: string;
     CONTENT_CACHE: KVNamespace;
     DB: D1Database;

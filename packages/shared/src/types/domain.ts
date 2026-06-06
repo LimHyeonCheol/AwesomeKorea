@@ -216,18 +216,25 @@ export interface AdminContent {
   slug: string;
   titleKo: string;
   titleEn: string | null;
-  aliases: string[];
   releaseYear: number | null;
   releaseDate: string | null;
+  status: ContentStatus;
+  reactionCount: number;
+  totalViews: number;
+  latestReactionAt: string | null;
+}
+
+export interface AdminContentDetail extends AdminContent {
+  aliases: string[];
   thumbnailUrl: string | null;
   description: string | null;
   searchKeywords: string[];
   priorityScore: number;
   heroMessageKo: string | null;
-  status: ContentStatus;
-  reactionCount: number;
-  totalViews: number;
-  latestReactionAt: string | null;
+}
+
+export interface AdminContentDetailPayload {
+  item: AdminContentDetail;
 }
 
 export interface AdminReactionVideo {

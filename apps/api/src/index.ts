@@ -8,6 +8,9 @@ import { clampLimit, clampPage, parseSort } from "./lib/pagination";
 import {
   createAdminCategory,
   createAdminContent,
+  deleteAdminCategory,
+  deleteAdminContent,
+  getAdminContentDetail,
   getAdminDashboard,
   saveAdminHomeSettings,
   updateAdminCategory,
@@ -50,7 +53,7 @@ app.use(
   "/api/*",
   cors({
     allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "PUT", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     origin: (origin) => origin || "*",
   }),
@@ -156,6 +159,32 @@ const requireStringField = (value: unknown, fieldLabel: string) => {
   return value.trim();
 };
 
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const requireSlugField = (
+  value: unknown,
+  fieldLabel: string,
+  options: {
+    disallowAll?: boolean;
+  } = {},
+) => {
+  const normalized = requireStringField(value, fieldLabel).toLowerCase();
+
+  if (!SLUG_PATTERN.test(normalized)) {
+    throw new HTTPException(400, {
+      message: `${fieldLabel}은(는) 영문 소문자, 숫자, 하이픈(-)만 사용할 수 있습니다.`,
+    });
+  }
+
+  if (options.disallowAll && normalized === "all") {
+    throw new HTTPException(400, {
+      message: `${fieldLabel}에 all은 사용할 수 없습니다.`,
+    });
+  }
+
+  return normalized;
+};
+
 const optionalStringField = (value: unknown) => {
   if (typeof value !== "string") {
     return null;
@@ -246,7 +275,9 @@ const parseHomeSettingsPayload = (payload: Record<string, unknown>): HomeSiteCop
 });
 
 const parseCategoryPayload = (payload: Record<string, unknown>) => ({
-  slug: requireStringField(payload.slug, "카테고리 slug"),
+  slug: requireSlugField(payload.slug, "카테고리 slug", {
+    disallowAll: true,
+  }),
   nameKo: requireStringField(payload.nameKo, "카테고리명"),
   sortOrder: parseIntegerField(payload.sortOrder, "카테고리 정렬 순서", {
     fallback: 0,
@@ -255,11 +286,26 @@ const parseCategoryPayload = (payload: Record<string, unknown>) => ({
   isActive: parseBooleanField(payload.isActive, true),
 });
 
+const parseContentCreatePayload = (payload: Record<string, unknown>) => ({
+  categoryId: parseIntegerField(payload.categoryId, "카테고리", {
+    min: 1,
+  }) as number,
+  slug: requireSlugField(payload.slug, "콘텐츠 slug"),
+  titleKo: requireStringField(payload.titleKo, "콘텐츠 제목(국문)"),
+  titleEn: optionalStringField(payload.titleEn),
+  releaseYear: parseIntegerField(payload.releaseYear, "출시 연도", {
+    allowNull: true,
+  }) as number | null,
+  releaseDate: optionalStringField(payload.releaseDate),
+  status:
+    payload.status === undefined ? "active" : parseContentStatusField(payload.status),
+});
+
 const parseContentPayload = (payload: Record<string, unknown>) => ({
   categoryId: parseIntegerField(payload.categoryId, "카테고리", {
     min: 1,
   }) as number,
-  slug: requireStringField(payload.slug, "콘텐츠 slug"),
+  slug: requireSlugField(payload.slug, "콘텐츠 slug"),
   titleKo: requireStringField(payload.titleKo, "콘텐츠 제목(국문)"),
   titleEn: optionalStringField(payload.titleEn),
   aliases: parseAliasesField(payload.aliases),
@@ -627,11 +673,12 @@ app.post("/api/admin/categories", async (c) => {
   c.header("Cache-Control", "no-store");
 
   const payload = parseCategoryPayload(await readJsonBody(c));
-  await createAdminCategory(c.env.DB, payload);
+  const id = await createAdminCategory(c.env.DB, payload);
   await bumpCacheVersion(c.env.CONTENT_CACHE);
 
   return c.json({
     ok: true,
+    id,
   });
 });
 
@@ -659,16 +706,67 @@ app.put("/api/admin/categories/:id", async (c) => {
   });
 });
 
-app.post("/api/admin/contents", async (c) => {
+app.delete("/api/admin/categories/:id", async (c) => {
   await loadAdminProfile(c);
   c.header("Cache-Control", "no-store");
 
-  const payload = parseContentPayload(await readJsonBody(c));
-  await createAdminContent(c.env.DB, payload);
+  const categoryId = parseIntegerField(c.req.param("id"), "카테고리 ID", {
+    min: 1,
+  }) as number;
+  const result = await deleteAdminCategory(c.env.DB, categoryId);
+
+  if (!result.ok) {
+    if (result.reason === "not_found") {
+      throw new HTTPException(404, {
+        message: "삭제할 카테고리를 찾을 수 없습니다.",
+      });
+    }
+
+    throw new HTTPException(409, {
+      message: `해당 카테고리에 연결된 콘텐츠 ${result.linkedContentCount}개를 먼저 정리해 주세요.`,
+    });
+  }
+
   await bumpCacheVersion(c.env.CONTENT_CACHE);
 
   return c.json({
     ok: true,
+    id: categoryId,
+  });
+});
+
+app.post("/api/admin/contents", async (c) => {
+  await loadAdminProfile(c);
+  c.header("Cache-Control", "no-store");
+
+  const payload = parseContentCreatePayload(await readJsonBody(c));
+  const id = await createAdminContent(c.env.DB, payload);
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+    id,
+  });
+});
+
+app.get("/api/admin/contents/:id", async (c) => {
+  await loadAdminProfile(c);
+  c.header("Cache-Control", "no-store");
+  await ensureBootstrapContentData(c.env);
+
+  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
+    min: 1,
+  }) as number;
+  const item = await getAdminContentDetail(c.env.DB, contentId);
+
+  if (!item) {
+    throw new HTTPException(404, {
+      message: "상세 정보를 불러올 콘텐츠를 찾을 수 없습니다.",
+    });
+  }
+
+  return c.json({
+    item,
   });
 });
 
@@ -685,6 +783,29 @@ app.put("/api/admin/contents/:id", async (c) => {
   if (!updated) {
     throw new HTTPException(404, {
       message: "수정할 콘텐츠를 찾을 수 없습니다.",
+    });
+  }
+
+  await bumpCacheVersion(c.env.CONTENT_CACHE);
+
+  return c.json({
+    ok: true,
+    id: contentId,
+  });
+});
+
+app.delete("/api/admin/contents/:id", async (c) => {
+  await loadAdminProfile(c);
+  c.header("Cache-Control", "no-store");
+
+  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
+    min: 1,
+  }) as number;
+  const deleted = await deleteAdminContent(c.env.DB, contentId);
+
+  if (!deleted) {
+    throw new HTTPException(404, {
+      message: "삭제할 콘텐츠를 찾을 수 없습니다.",
     });
   }
 

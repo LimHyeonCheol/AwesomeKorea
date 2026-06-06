@@ -2,6 +2,13 @@
 
 ## 변경 이력
 
+### v0.1.4 (2026-06-07)
+
+- 어드민 `카테고리 관리` 섹션을 행 기반 UI로 개편해 `+ / - / 선택 삭제` 흐름과 저장 전 임시 행 제거를 지원합니다.
+- 어드민 `콘텐츠 관리` 섹션을 그리드형 목록 + 섹션 하단 `show/hide` 상세 패널 구조로 바꾸고, 목록 행 클릭으로 상세 수정 패널을 여는 방식으로 변경했습니다.
+- 관리자 API에 카테고리/콘텐츠 `POST`, `DELETE`, 콘텐츠 상세 조회 `GET /api/admin/contents/:id`를 보강해 생성-상세수정-삭제 흐름을 완성했습니다.
+- 안전한 삭제를 위해 콘텐츠가 연결된 카테고리 삭제는 `409`로 막고, 콘텐츠 삭제 시 관련 리액션/편성/랭킹 데이터도 함께 정리합니다.
+
 ### v0.1.3 (2026-06-06)
 
 - `/admin`을 브라우저 토큰 입력 방식에서 `관리자 로그인 + HTTP-only 세션 쿠키` 방식으로 리팩토링했습니다.
@@ -228,16 +235,29 @@ npm run dev:web
 4. `npm run dev:web`
 5. 브라우저에서 `http://127.0.0.1:5173/admin` 접속
 6. `admin / dlaguscjfWkd` 로그인
-7. 카테고리, 콘텐츠, 리액션 카드에서 저장 버튼으로 수정 확인
+7. 카테고리 섹션에서 `+`로 임시 행 추가, `-`로 저장 전 행 제거, 체크박스 + `선택 삭제`로 삭제 확인
+8. 콘텐츠 섹션에서 `+`로 신규 행 추가 후 저장, 기존 행 클릭 시 섹션 아래 상세 패널이 열리는지 확인
+9. 콘텐츠 상세 패널에서 메타데이터 수정 후 `상세 저장`, 체크박스 + `선택 삭제`로 삭제 확인
+10. 리액션 카드에서 저장 버튼으로 수정 확인
 
 어드민 화면 동작 방식:
 
 - `/admin` 진입 시 프런트가 `GET /api/admin/me`로 세션을 확인합니다.
 - 세션이 없으면 로그인 폼만 노출되고, 로그인 시 `POST /api/admin/login`으로 HTTP-only 쿠키를 발급받습니다.
 - 로그인 후에는 `GET /api/admin/dashboard`로 수정 대상 데이터를 불러옵니다.
-- 저장은 아래 수정 전용 엔드포인트를 사용합니다.
+- 카테고리 추가/삭제는 아래 엔드포인트를 사용합니다.
+  - `POST /api/admin/categories`
   - `PUT /api/admin/categories/:id`
+  - `DELETE /api/admin/categories/:id`
+- 콘텐츠 목록/상세/추가/삭제는 아래 엔드포인트를 사용합니다.
+  - `POST /api/admin/contents`
+  - `GET /api/admin/contents/:id`
   - `PUT /api/admin/contents/:id`
+  - `DELETE /api/admin/contents/:id`
+- 콘텐츠 상세 수정 패널은 화면 이동 대신 콘텐츠 섹션 아래에서 show/hide 됩니다.
+- 카테고리 삭제는 연결된 콘텐츠가 없을 때만 허용되고, 연결된 콘텐츠가 있으면 `409`를 반환합니다.
+- 콘텐츠 삭제 시 해당 콘텐츠에 연결된 `reaction_videos`, `editorial_entries`, `ranking_snapshots`를 함께 정리합니다.
+- 리액션 저장은 아래 수정 전용 엔드포인트를 사용합니다.
   - `PUT /api/admin/reactions/:youtubeVideoId`
 - 로그아웃은 `POST /api/admin/logout`으로 처리합니다.
 - 내부 배치 엔드포인트인 `/internal/*`는 계속 `INTERNAL_API_TOKEN` 기반입니다.
@@ -251,12 +271,25 @@ curl -i -c admin-cookie.txt -X POST http://127.0.0.1:9000/api/admin/login ^
 
 curl -b admin-cookie.txt http://127.0.0.1:9000/api/admin/me
 curl -b admin-cookie.txt http://127.0.0.1:9000/api/admin/dashboard
+curl -i -b admin-cookie.txt -X POST http://127.0.0.1:9000/api/admin/categories ^
+  -H "Content-Type: application/json" ^
+  -d "{\"slug\":\"codex-ui-test-cat\",\"nameKo\":\"코덱스 테스트\",\"sortOrder\":99,\"isActive\":true}"
+
+curl -i -b admin-cookie.txt http://127.0.0.1:9000/api/admin/contents/<created-content-id>
+
+curl -i -b admin-cookie.txt -X POST http://127.0.0.1:9000/api/admin/contents ^
+  -H "Content-Type: application/json" ^
+  -d "{\"categoryId\":1,\"slug\":\"codex-ui-test-content\",\"titleKo\":\"코덱스 테스트 콘텐츠\",\"titleEn\":\"Codex Test Content\",\"releaseYear\":2026,\"releaseDate\":\"2026-06\",\"status\":\"active\"}"
+
 curl -i -b admin-cookie.txt -X PUT http://127.0.0.1:9000/api/admin/categories/9999 ^
   -H "Content-Type: application/json" ^
   -d "{\"slug\":\"ghost\",\"nameKo\":\"고스트\",\"sortOrder\":99,\"isActive\":false}"
+
+curl -i -b admin-cookie.txt -X DELETE http://127.0.0.1:9000/api/admin/contents/<created-content-id>
+curl -i -b admin-cookie.txt -X DELETE http://127.0.0.1:9000/api/admin/categories/<created-category-id>
 ```
 
-마지막 예시는 존재하지 않는 대상을 수정할 때 `404`가 반환되는지 확인하는 용도입니다.
+카테고리에 연결된 콘텐츠가 남아 있는 상태에서 삭제하면 `409`가 반환되고, 콘텐츠를 먼저 지운 뒤 같은 카테고리를 삭제하면 `200`이 반환됩니다.
 
 ## 환경 변수
 

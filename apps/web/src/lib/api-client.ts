@@ -1,6 +1,7 @@
 import type {
   AdminDashboardPayload,
   AdminProfile,
+  AdminContentDetailPayload,
   AdminSessionPayload,
   Category,
   CategoryFilter,
@@ -141,6 +142,10 @@ export const apiClient = {
     request<AdminDashboardPayload>("/api/admin/dashboard", {
       credentials: "include",
     }),
+  getAdminContentDetail: (contentId: number) =>
+    request<AdminContentDetailPayload>(`/api/admin/contents/${contentId}`, {
+      credentials: "include",
+    }),
   getAdminSession: () =>
     request<AdminSessionPayload>("/api/admin/me", {
       credentials: "include",
@@ -156,6 +161,17 @@ export const apiClient = {
       method: "POST",
       credentials: "include",
     }),
+  createAdminCategory: (payload: {
+    slug: string;
+    nameKo: string;
+    sortOrder: number;
+    isActive: boolean;
+  }) =>
+    request<{ id: number; ok: boolean }>("/api/admin/categories", {
+      method: "POST",
+      credentials: "include",
+      body: payload,
+    }),
   updateAdminCategory: (
     categoryId: number,
     payload: {
@@ -167,6 +183,25 @@ export const apiClient = {
   ) =>
     request<{ id: number; ok: boolean }>(`/api/admin/categories/${categoryId}`, {
       method: "PUT",
+      credentials: "include",
+      body: payload,
+    }),
+  deleteAdminCategory: (categoryId: number) =>
+    request<{ id: number; ok: boolean }>(`/api/admin/categories/${categoryId}`, {
+      method: "DELETE",
+      credentials: "include",
+    }),
+  createAdminContent: (payload: {
+    categoryId: number;
+    slug: string;
+    titleKo: string;
+    titleEn: string | null;
+    releaseYear: number | null;
+    releaseDate: string | null;
+    status: ContentStatus;
+  }) =>
+    request<{ id: number; ok: boolean }>("/api/admin/contents", {
+      method: "POST",
       credentials: "include",
       body: payload,
     }),
@@ -192,6 +227,11 @@ export const apiClient = {
       method: "PUT",
       credentials: "include",
       body: payload,
+    }),
+  deleteAdminContent: (contentId: number) =>
+    request<{ id: number; ok: boolean }>(`/api/admin/contents/${contentId}`, {
+      method: "DELETE",
+      credentials: "include",
     }),
   updateAdminReaction: (
     youtubeVideoId: string,

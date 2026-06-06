@@ -1,9 +1,9 @@
 import type {
   AdminContent,
+  AdminContentDetail,
   AdminDashboardPayload,
   AdminReactionVideo,
   Category,
-  CategorySlug,
   ContentStatus,
   HomeSiteCopy,
   TranslationSource,
@@ -24,26 +24,29 @@ interface AdminCategoryRow {
   sortOrder: number;
 }
 
-interface AdminContentRow {
-  aliasesJson: string | null;
+interface AdminContentSummaryRow {
   categoryId: number;
   categoryNameKo: string;
   categorySlug: string;
-  description: string | null;
-  heroMessageKo: string | null;
   id: number;
   latestReactionAt: string | null;
-  priorityScore: number;
   reactionCount: number;
   releaseDate: string | null;
   releaseYear: number | null;
-  searchKeywordsJson: string | null;
   slug: string;
   status: ContentStatus;
-  thumbnailUrl: string | null;
   titleEn: string | null;
   titleKo: string;
   totalViews: number;
+}
+
+interface AdminContentDetailRow extends AdminContentSummaryRow {
+  aliasesJson: string | null;
+  description: string | null;
+  heroMessageKo: string | null;
+  priorityScore: number;
+  searchKeywordsJson: string | null;
+  thumbnailUrl: string | null;
 }
 
 interface AdminReactionRow {
@@ -91,13 +94,13 @@ const toTranslationSource = (
 
 const mapCategory = (row: AdminCategoryRow): Category => ({
   id: toNumber(row.id),
-  slug: toStringValue(row.slug) as CategorySlug,
+  slug: toStringValue(row.slug),
   nameKo: toStringValue(row.nameKo),
   sortOrder: toNumber(row.sortOrder),
   isActive: toBoolean(row.isActive),
 });
 
-const mapAdminContent = (row: AdminContentRow): AdminContent => ({
+const mapAdminContent = (row: AdminContentSummaryRow): AdminContent => ({
   id: toNumber(row.id),
   categoryId: toNumber(row.categoryId),
   categorySlug: toStringValue(row.categorySlug),
@@ -105,18 +108,22 @@ const mapAdminContent = (row: AdminContentRow): AdminContent => ({
   slug: toStringValue(row.slug),
   titleKo: toStringValue(row.titleKo),
   titleEn: toNullableString(row.titleEn),
-  aliases: parseJsonArray(row.aliasesJson),
   releaseYear: row.releaseYear === null ? null : toNumber(row.releaseYear),
   releaseDate: toNullableString(row.releaseDate),
+  status: row.status,
+  reactionCount: toNumber(row.reactionCount),
+  totalViews: toNumber(row.totalViews),
+  latestReactionAt: toNullableString(row.latestReactionAt),
+});
+
+const mapAdminContentDetail = (row: AdminContentDetailRow): AdminContentDetail => ({
+  ...mapAdminContent(row),
+  aliases: parseJsonArray(row.aliasesJson),
   thumbnailUrl: toNullableString(row.thumbnailUrl),
   description: toNullableString(row.description),
   searchKeywords: parseJsonArray(row.searchKeywordsJson),
   priorityScore: toNumber(row.priorityScore),
   heroMessageKo: toNullableString(row.heroMessageKo),
-  status: row.status,
-  reactionCount: toNumber(row.reactionCount),
-  totalViews: toNumber(row.totalViews),
-  latestReactionAt: toNullableString(row.latestReactionAt),
 });
 
 const mapAdminReaction = (row: AdminReactionRow): AdminReactionVideo => ({
@@ -194,7 +201,7 @@ export const createAdminCategory = async (
     slug: string;
     sortOrder: number;
   },
-): Promise<void> => {
+): Promise<number> => {
   await db
     .prepare(
       `
@@ -209,6 +216,19 @@ export const createAdminCategory = async (
     )
     .bind(input.slug, input.nameKo, input.sortOrder, input.isActive ? 1 : 0)
     .run();
+
+  const row = await db
+    .prepare(
+      `
+        SELECT id
+        FROM categories
+        WHERE slug = ?
+      `,
+    )
+    .bind(input.slug)
+    .first<{ id: number }>();
+
+  return toNumber(row?.id);
 };
 
 export const updateAdminCategory = async (
@@ -239,8 +259,131 @@ export const updateAdminCategory = async (
   return wasRowAffected(result);
 };
 
+export const deleteAdminCategory = async (
+  db: D1Database,
+  categoryId: number,
+): Promise<
+  | {
+      ok: true;
+    }
+  | {
+      linkedContentCount: number;
+      ok: false;
+      reason: "has_contents" | "not_found";
+    }
+> => {
+  const categoryRow = await db
+    .prepare(
+      `
+        SELECT id
+        FROM categories
+        WHERE id = ?
+      `,
+    )
+    .bind(categoryId)
+    .first<{ id: number }>();
+
+  if (!categoryRow) {
+    return {
+      ok: false,
+      reason: "not_found",
+      linkedContentCount: 0,
+    };
+  }
+
+  const linkedRow = await db
+    .prepare(
+      `
+        SELECT COUNT(*) AS total
+        FROM contents
+        WHERE category_id = ?
+      `,
+    )
+    .bind(categoryId)
+    .first<{ total: number }>();
+
+  const linkedContentCount = toNumber(linkedRow?.total);
+
+  if (linkedContentCount > 0) {
+    return {
+      ok: false,
+      reason: "has_contents",
+      linkedContentCount,
+    };
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `
+          DELETE FROM ranking_snapshots
+          WHERE category_id = ?
+        `,
+      )
+      .bind(categoryId),
+    db
+      .prepare(
+        `
+          DELETE FROM categories
+          WHERE id = ?
+        `,
+      )
+      .bind(categoryId),
+  ]);
+
+  return {
+    ok: true,
+  };
+};
+
 export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> => {
   const result = await db
+    .prepare(
+      `
+        SELECT
+          c.id AS id,
+          c.category_id AS categoryId,
+          cat.slug AS categorySlug,
+          cat.name_ko AS categoryNameKo,
+          c.slug AS slug,
+          c.title_ko AS titleKo,
+          c.title_en AS titleEn,
+          c.release_year AS releaseYear,
+          c.release_date AS releaseDate,
+          c.status AS status,
+          COUNT(rv.id) AS reactionCount,
+          COALESCE(SUM(rv.view_count), 0) AS totalViews,
+          MAX(rv.published_at) AS latestReactionAt
+        FROM contents c
+        JOIN categories cat
+          ON cat.id = c.category_id
+        LEFT JOIN reaction_videos rv
+          ON rv.content_id = c.id
+          AND rv.is_overseas_reaction = 1
+        GROUP BY
+          c.id,
+          c.category_id,
+          cat.slug,
+          cat.name_ko,
+          c.slug,
+          c.title_ko,
+          c.title_en,
+          c.release_year,
+          c.release_date,
+          c.status
+        ORDER BY cat.sort_order ASC, c.updated_at DESC, c.id DESC
+      `,
+    )
+    .all<AdminContentSummaryRow>();
+
+  return (result.results ?? []).map(mapAdminContent);
+};
+
+export const getAdminContentDetail = async (
+  db: D1Database,
+  contentId: number,
+): Promise<AdminContentDetail | null> => {
+  const row = await db
     .prepare(
       `
         SELECT
@@ -269,6 +412,7 @@ export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> 
         LEFT JOIN reaction_videos rv
           ON rv.content_id = c.id
           AND rv.is_overseas_reaction = 1
+        WHERE c.id = ?
         GROUP BY
           c.id,
           c.category_id,
@@ -286,32 +430,26 @@ export const getAdminContents = async (db: D1Database): Promise<AdminContent[]> 
           c.priority_score,
           c.hero_message_ko,
           c.status
-        ORDER BY cat.sort_order ASC, c.updated_at DESC, c.id DESC
       `,
     )
-    .all<AdminContentRow>();
+    .bind(contentId)
+    .first<AdminContentDetailRow>();
 
-  return (result.results ?? []).map(mapAdminContent);
+  return row ? mapAdminContentDetail(row) : null;
 };
 
 export const createAdminContent = async (
   db: D1Database,
   input: {
-    aliases: string[];
     categoryId: number;
-    description: string | null;
-    heroMessageKo: string | null;
-    priorityScore: number;
     releaseDate: string | null;
     releaseYear: number | null;
-    searchKeywords: string[];
     slug: string;
     status: ContentStatus;
-    thumbnailUrl: string | null;
     titleEn: string | null;
     titleKo: string;
   },
-): Promise<void> => {
+): Promise<number> => {
   await db
     .prepare(
       `
@@ -339,17 +477,30 @@ export const createAdminContent = async (
       input.slug,
       input.titleKo,
       input.titleEn,
-      JSON.stringify(normalizeAliases(input.aliases)),
+      JSON.stringify([]),
       input.releaseYear,
       input.releaseDate,
-      input.thumbnailUrl,
-      input.description,
-      JSON.stringify(normalizeSearchKeywords(input.searchKeywords)),
-      input.priorityScore,
-      input.heroMessageKo,
+      null,
+      null,
+      JSON.stringify([]),
+      0,
+      null,
       input.status,
     )
     .run();
+
+  const row = await db
+    .prepare(
+      `
+        SELECT id
+        FROM contents
+        WHERE slug = ?
+      `,
+    )
+    .bind(input.slug)
+    .first<{ id: number }>();
+
+  return toNumber(row?.id);
 };
 
 export const updateAdminContent = async (
@@ -412,6 +563,64 @@ export const updateAdminContent = async (
     .run();
 
   return wasRowAffected(result);
+};
+
+export const deleteAdminContent = async (
+  db: D1Database,
+  contentId: number,
+): Promise<boolean> => {
+  const existing = await db
+    .prepare(
+      `
+        SELECT slug
+        FROM contents
+        WHERE id = ?
+      `,
+    )
+    .bind(contentId)
+    .first<{ slug: string }>();
+
+  if (!existing?.slug) {
+    return false;
+  }
+
+  await db.batch([
+    db
+      .prepare(
+        `
+          DELETE FROM ranking_snapshots
+          WHERE content_id = ?
+        `,
+      )
+      .bind(contentId),
+    db
+      .prepare(
+        `
+          DELETE FROM editorial_entries
+          WHERE target_type = 'content'
+            AND target_ref = ?
+        `,
+      )
+      .bind(existing.slug),
+    db
+      .prepare(
+        `
+          DELETE FROM reaction_videos
+          WHERE content_id = ?
+        `,
+      )
+      .bind(contentId),
+    db
+      .prepare(
+        `
+          DELETE FROM contents
+          WHERE id = ?
+        `,
+      )
+      .bind(contentId),
+  ]);
+
+  return true;
 };
 
 export const getAdminReactions = async (

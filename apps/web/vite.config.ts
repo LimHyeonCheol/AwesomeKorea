@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 
 const LOCAL_API_PROXY_TARGET =
   process.env.AWESOMEKOREA_API_PROXY_TARGET ?? "http://127.0.0.1:9000";
+const LOCAL_API_PROXY_TIMEOUT_MS = 8_000;
 const webPackage = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version?: string };
@@ -30,8 +31,16 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      "/api": LOCAL_API_PROXY_TARGET,
-      "/internal": LOCAL_API_PROXY_TARGET,
+      "/api": {
+        target: LOCAL_API_PROXY_TARGET,
+        proxyTimeout: LOCAL_API_PROXY_TIMEOUT_MS,
+        timeout: LOCAL_API_PROXY_TIMEOUT_MS,
+      },
+      "/internal": {
+        target: LOCAL_API_PROXY_TARGET,
+        proxyTimeout: LOCAL_API_PROXY_TIMEOUT_MS,
+        timeout: LOCAL_API_PROXY_TIMEOUT_MS,
+      },
     },
   },
 });

@@ -6,7 +6,7 @@ import { AppFooter } from "../components/common/AppFooter";
 import { StatusNotice } from "../components/common/StatusNotice";
 import { AdminEditorPage } from "../features/admin/AdminEditorPage";
 import { AdminLoginForm } from "../features/admin/AdminLoginForm";
-import { apiClient, isApiRequestError } from "../lib/api-client";
+import { apiClient, isApiRequestError, isApiTimeoutError } from "../lib/api-client";
 
 interface AdminPageProps {
   onNavigateHome: () => void;
@@ -44,9 +44,11 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
         } else {
           setAdmin(null);
           setPageError(
-            error instanceof Error
-              ? error.message
-              : "로그인 상태를 확인하지 못했습니다.",
+            isApiTimeoutError(error)
+              ? "관리자 세션 확인 응답이 지연되고 있습니다. 로컬 API 서버(127.0.0.1:9000)가 실행 중인지 확인한 뒤 다시 시도해 주세요."
+              : error instanceof Error
+                ? error.message
+                : "로그인 상태를 확인하지 못했습니다.",
           );
         }
       } finally {
@@ -61,7 +63,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   const handleLogout = async () => {
     try {
@@ -69,15 +71,13 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
       setAdmin(null);
       setPageError(null);
     } catch (error) {
-      setPageError(
-        error instanceof Error ? error.message : "로그아웃을 처리하지 못했습니다.",
-      );
+      setPageError(error instanceof Error ? error.message : "로그아웃을 처리하지 못했습니다.");
     }
   };
 
   const handleSessionExpired = () => {
     setAdmin(null);
-    setPageError("세션이 만료되어 다시 로그인해야 합니다.");
+    setPageError("세션이 만료되었습니다. 다시 로그인해 주세요.");
   };
 
   const handleRefresh = () => {
@@ -96,15 +96,13 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
             </h1>
             <p className="admin-header__copy">
               {admin
-                ? "기존 카테고리, 콘텐츠, 유튜브 반응 노출 문구를 안전하게 수정하는 관리자 화면입니다."
-                : "브라우저 토큰 입력을 없애고, 세션 기반 로그인으로 관리자 화면에 접근합니다."}
+                ? "카테고리, 콘텐츠, 유튜브 반응 노출 문구를 한 화면에서 빠르게 관리합니다."
+                : "브라우저 토큰 입력 없이 세션 기반 로그인으로 관리자 화면에 접근합니다."}
             </p>
           </div>
 
           <div className="admin-header__actions">
-            {admin ? (
-              <span className="admin-pill">{admin.displayName} 로그인 중</span>
-            ) : null}
+            {admin ? <span className="admin-pill">{admin.displayName} 로그인 중</span> : null}
             <button
               className="chip-button chip-button--ghost"
               type="button"
@@ -141,6 +139,8 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
               title="관리자 화면을 준비하지 못했습니다."
               description={pageError}
               tone="danger"
+              actionLabel="다시 시도"
+              onAction={handleRefresh}
             />
           ) : null}
 
@@ -156,7 +156,6 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
               onSuccess={(nextAdmin) => {
                 setAdmin(nextAdmin);
                 setPageError(null);
-                setRefreshKey((current) => current + 1);
               }}
             />
           ) : null}

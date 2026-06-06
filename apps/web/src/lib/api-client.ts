@@ -1,7 +1,7 @@
 import type {
+  AdminContentDetailPayload,
   AdminDashboardPayload,
   AdminProfile,
-  AdminContentDetailPayload,
   AdminSessionPayload,
   Category,
   CategoryFilter,
@@ -21,6 +21,9 @@ import { getDevPreviewPayload } from "./dev-preview";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const DEV_PREVIEW_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_PREVIEW === "true";
+const ADMIN_API_TIMEOUT_MS = 8_000;
+const ADMIN_MUTATION_TIMEOUT_MS = 12_000;
+const DEFAULT_REQUEST_ERROR_MESSAGE = "요청을 처리하지 못했습니다.";
 
 export class ApiRequestError extends Error {
   status: number;
@@ -32,8 +35,25 @@ export class ApiRequestError extends Error {
   }
 }
 
+export class ApiTimeoutError extends Error {
+  path: string;
+  timeoutMs: number;
+
+  constructor(path: string, timeoutMs: number) {
+    super(
+      `서버가 ${Math.max(1, Math.round(timeoutMs / 1000))}초 안에 응답하지 않았습니다. 로컬 API 서버가 실행 중인지 확인한 뒤 다시 시도해 주세요.`,
+    );
+    this.name = "ApiTimeoutError";
+    this.path = path;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 export const isApiRequestError = (error: unknown, status?: number): error is ApiRequestError =>
   error instanceof ApiRequestError && (status === undefined || error.status === status);
+
+export const isApiTimeoutError = (error: unknown): error is ApiTimeoutError =>
+  error instanceof ApiTimeoutError;
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
   const searchParams = new URLSearchParams();
@@ -56,12 +76,22 @@ const request = async <T>(
     credentials?: RequestCredentials;
     headers?: Record<string, string>;
     method?: string;
+    timeoutMs?: number;
   } = {},
 ) => {
+  const timeoutMs = options.timeoutMs;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutHandle = timeoutMs
+    ? globalThis.setTimeout(() => {
+        controller?.abort();
+      }, timeoutMs)
+    : null;
+
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: options.method ?? "GET",
       credentials: options.credentials ?? "same-origin",
+      signal: controller?.signal,
       headers: {
         ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...options.headers,
@@ -70,14 +100,13 @@ const request = async <T>(
     });
 
     if (!response.ok) {
-      const fallback = "요청을 처리하지 못했습니다.";
-      let message = fallback;
+      let message = DEFAULT_REQUEST_ERROR_MESSAGE;
 
       try {
         const payload = (await response.json()) as { message?: string };
-        message = payload.message ?? fallback;
+        message = payload.message ?? DEFAULT_REQUEST_ERROR_MESSAGE;
       } catch {
-        message = fallback;
+        message = DEFAULT_REQUEST_ERROR_MESSAGE;
       }
 
       throw new ApiRequestError(response.status, message);
@@ -93,11 +122,19 @@ const request = async <T>(
       }
     }
 
+    if (error instanceof Error && error.name === "AbortError" && timeoutMs) {
+      throw new ApiTimeoutError(path, timeoutMs);
+    }
+
     if (error instanceof Error) {
       throw error;
     }
 
-    throw new Error("요청을 처리하지 못했습니다.");
+    throw new Error(DEFAULT_REQUEST_ERROR_MESSAGE);
+  } finally {
+    if (timeoutHandle) {
+      globalThis.clearTimeout(timeoutHandle);
+    }
   }
 };
 
@@ -141,25 +178,30 @@ export const apiClient = {
   getAdminDashboard: () =>
     request<AdminDashboardPayload>("/api/admin/dashboard", {
       credentials: "include",
+      timeoutMs: ADMIN_API_TIMEOUT_MS,
     }),
   getAdminContentDetail: (contentId: number) =>
     request<AdminContentDetailPayload>(`/api/admin/contents/${contentId}`, {
       credentials: "include",
+      timeoutMs: ADMIN_API_TIMEOUT_MS,
     }),
   getAdminSession: () =>
     request<AdminSessionPayload>("/api/admin/me", {
       credentials: "include",
+      timeoutMs: ADMIN_API_TIMEOUT_MS,
     }),
   loginAdmin: (payload: { loginId: string; password: string }) =>
     request<AdminSessionPayload>("/api/admin/login", {
       method: "POST",
       credentials: "include",
       body: payload,
+      timeoutMs: ADMIN_API_TIMEOUT_MS,
     }),
   logoutAdmin: () =>
     request<{ ok: boolean }>("/api/admin/logout", {
       method: "POST",
       credentials: "include",
+      timeoutMs: ADMIN_API_TIMEOUT_MS,
     }),
   createAdminCategory: (payload: {
     slug: string;
@@ -171,6 +213,7 @@ export const apiClient = {
       method: "POST",
       credentials: "include",
       body: payload,
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   updateAdminCategory: (
     categoryId: number,
@@ -185,11 +228,13 @@ export const apiClient = {
       method: "PUT",
       credentials: "include",
       body: payload,
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   deleteAdminCategory: (categoryId: number) =>
     request<{ id: number; ok: boolean }>(`/api/admin/categories/${categoryId}`, {
       method: "DELETE",
       credentials: "include",
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   createAdminContent: (payload: {
     categoryId: number;
@@ -204,6 +249,7 @@ export const apiClient = {
       method: "POST",
       credentials: "include",
       body: payload,
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   updateAdminContent: (
     contentId: number,
@@ -227,11 +273,13 @@ export const apiClient = {
       method: "PUT",
       credentials: "include",
       body: payload,
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   deleteAdminContent: (contentId: number) =>
     request<{ id: number; ok: boolean }>(`/api/admin/contents/${contentId}`, {
       method: "DELETE",
       credentials: "include",
+      timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
   updateAdminReaction: (
     youtubeVideoId: string,
@@ -248,6 +296,7 @@ export const apiClient = {
         method: "PUT",
         credentials: "include",
         body: payload,
+        timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
       },
     ),
 };

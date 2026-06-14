@@ -58,8 +58,9 @@ console.log(`[deploy:web] Pages 프로젝트 '${projectName}' 존재 여부를 �
 
 const projectsOutput = runNodeCommand([wranglerPath, "pages", "project", "list", "--json"]);
 const projects = JSON.parse(projectsOutput);
+const getProjectName = (project) => project?.name ?? project?.["Project Name"] ?? null;
 const hasProject = Array.isArray(projects)
-  ? projects.some((project) => project?.name === projectName)
+  ? projects.some((project) => getProjectName(project) === projectName)
   : false;
 
 if (!hasProject) {

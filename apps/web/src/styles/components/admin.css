@@ -16,6 +16,11 @@
   padding: 1.5rem 0;
 }
 
+.app-shell--admin .site-main,
+.app-shell--admin .admin-header__inner {
+  width: min(1640px, calc(100% - 2rem));
+}
+
 .admin-header__eyebrow,
 .admin-summary__label {
   color: rgba(255, 255, 255, 0.72);
@@ -189,7 +194,7 @@
 }
 
 .admin-grid__table--contents {
-  min-width: 1180px;
+  min-width: 1520px;
 }
 
 .admin-grid__header,
@@ -322,13 +327,6 @@
   gap: 0.6rem;
 }
 
-.admin-grid__cell--stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.55rem;
-}
-
 .admin-grid__checkbox {
   display: inline-flex;
   align-items: center;
@@ -358,8 +356,7 @@
 }
 
 .admin-grid__save-button {
-  width: 100%;
-  min-width: 0;
+  min-width: 6.5rem;
   justify-content: center;
 }
 
@@ -476,6 +473,11 @@
   .admin-summary,
   .admin-card__grid {
     grid-template-columns: 1fr;
+  }
+
+  .app-shell--admin .site-main,
+  .app-shell--admin .admin-header__inner {
+    width: min(100% - 1rem, 1640px);
   }
 
   .admin-header__inner,

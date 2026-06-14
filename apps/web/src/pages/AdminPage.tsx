@@ -86,7 +86,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell app-shell--admin">
       <header className="admin-header">
         <div className="admin-header__inner">
           <div>

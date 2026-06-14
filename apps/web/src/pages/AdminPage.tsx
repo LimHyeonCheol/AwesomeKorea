@@ -96,7 +96,7 @@ export function AdminPage({ onNavigateHome }: AdminPageProps) {
             </h1>
             <p className="admin-header__copy">
               {admin
-                ? "카테고리, 콘텐츠, 유튜브 반응 노출 문구를 한 화면에서 빠르게 관리합니다."
+                ? "카테고리와 콘텐츠 정보를 한 화면에서 빠르게 관리합니다."
                 : "브라우저 토큰 입력 없이 세션 기반 로그인으로 관리자 화면에 접근합니다."}
             </p>
           </div>

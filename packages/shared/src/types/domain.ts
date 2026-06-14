@@ -237,40 +237,10 @@ export interface AdminContentDetailPayload {
   item: AdminContentDetail;
 }
 
-export interface AdminReactionVideo {
-  id: number;
-  youtubeVideoId: string;
-  contentId: number;
-  contentSlug: string;
-  contentTitleKo: string;
-  categorySlug: string;
-  categoryNameKo: string;
-  channelName: string;
-  originalTitle: string;
-  localizedTitle: string | null;
-  localizedTitleSource: TranslationSource | null;
-  originalDescription: string | null;
-  localizedDescription: string | null;
-  localizedDescriptionSource: TranslationSource | null;
-  adminTitle: string | null;
-  adminDescription: string | null;
-  displayTitle: string;
-  thumbnailUrl: string | null;
-  publishedAt: string;
-  viewCount: number;
-  likeCount: number;
-  commentCount: number;
-  youtubeUrl: string;
-  isFeatured: boolean;
-  featuredOrder: number;
-}
-
 export interface AdminDashboardPayload {
   settings: HomeSiteCopy;
   categories: Category[];
   contents: AdminContent[];
-  featuredReactions: AdminReactionVideo[];
-  reactions: AdminReactionVideo[];
 }
 
 export interface AdminProfile {

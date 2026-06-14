@@ -4,7 +4,6 @@ import type {
   AdminContent,
   AdminContentDetail,
   AdminProfile,
-  AdminReactionVideo,
   Category,
   ContentStatus,
 } from "@awesomekorea/shared";
@@ -109,7 +108,6 @@ export function AdminEditorPage({
   const [actionError, setActionError] = useState<string | null>(null);
   const [categoryDrafts, setCategoryDrafts] = useState<CategoryDraft[]>([]);
   const [contentDrafts, setContentDrafts] = useState<ContentDraft[]>([]);
-  const [reactionDrafts, setReactionDrafts] = useState<AdminReactionVideo[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [selectedContentIds, setSelectedContentIds] = useState<number[]>([]);
   const [openContentId, setOpenContentId] = useState<number | null>(null);
@@ -146,7 +144,6 @@ export function AdminEditorPage({
 
     setCategoryDrafts(dashboardResource.data.categories.map((category) => ({ ...category })));
     setContentDrafts(dashboardResource.data.contents.map((content) => ({ ...content })));
-    setReactionDrafts(dashboardResource.data.reactions);
     setSelectedCategoryIds((current) =>
       current.filter((id) => dashboardResource.data?.categories.some((category) => category.id === id)),
     );
@@ -168,7 +165,7 @@ export function AdminEditorPage({
 
   const savedCategories = categoryDrafts.filter((category) => !category.isNew);
   const activeCategoryCount = savedCategories.filter((category) => category.isActive).length;
-  const featuredReactionCount = reactionDrafts.filter((reaction) => reaction.isFeatured).length;
+  const savedContentCount = contentDrafts.filter((content) => !content.isNew).length;
   const refreshDashboard = async () => {
     await dashboardResource.refetch();
   };
@@ -323,23 +320,6 @@ export function AdminEditorPage({
             categoryNameKo: nextCategory.nameKo,
           }
         : current,
-    );
-  };
-
-  const handleReactionChange = <K extends keyof AdminReactionVideo>(
-    reactionId: number,
-    field: K,
-    value: AdminReactionVideo[K],
-  ) => {
-    setReactionDrafts((current) =>
-      current.map((reaction) =>
-        reaction.id === reactionId
-          ? {
-              ...reaction,
-              [field]: value,
-            }
-          : reaction,
-      ),
     );
   };
 
@@ -543,8 +523,8 @@ export function AdminEditorPage({
           <strong className="admin-summary__value">{activeCategoryCount}개</strong>
         </div>
         <div className="admin-summary__card">
-          <span className="admin-summary__label">메인 추천 리액션</span>
-          <strong className="admin-summary__value">{featuredReactionCount}개</strong>
+          <span className="admin-summary__label">관리 대상 콘텐츠</span>
+          <strong className="admin-summary__value">{savedContentCount}개</strong>
         </div>
       </section>
 
@@ -569,7 +549,7 @@ export function AdminEditorPage({
       {dashboardResource.isLoading && !dashboardResource.data ? (
         <StatusNotice
           title="관리자 데이터를 불러오는 중입니다."
-          description="카테고리, 콘텐츠, 리액션 수정 데이터를 정리하고 있습니다."
+          description="카테고리와 콘텐츠 관리 데이터를 정리하고 있습니다."
         />
       ) : null}
 
@@ -755,7 +735,7 @@ export function AdminEditorPage({
                   <span>출시</span>
                   <span>상태</span>
                   <span>리액션</span>
-                  <span>상세</span>
+                  <span>작업</span>
                 </div>
 
                 {contentDrafts.map((content) =>
@@ -860,14 +840,14 @@ export function AdminEditorPage({
 
                       <div className="admin-grid__cell admin-grid__cell--muted">저장 후 집계</div>
 
-                      <div className="admin-grid__cell admin-grid__cell--actions">
+                      <div className="admin-grid__cell admin-grid__cell--actions admin-grid__cell--sticky-action">
                         <button
-                          className="chip-button chip-button--solid"
+                          className="chip-button chip-button--solid admin-grid__save-button"
                           disabled={savingKey === `content-${content.id}`}
                           type="button"
                           onClick={() => void handleSaveNewContent(content)}
                         >
-                          저장
+                          신규 저장
                         </button>
                       </div>
                     </div>
@@ -911,7 +891,7 @@ export function AdminEditorPage({
                       <div className="admin-grid__cell admin-grid__cell--muted">
                         {content.reactionCount}개 / {formatCompactNumber(content.totalViews)}
                       </div>
-                      <div className="admin-grid__cell">
+                      <div className="admin-grid__cell admin-grid__cell--sticky-action">
                         <span className="admin-grid__detail-indicator">
                           {openContentId === content.id ? "열림" : "열기"}
                         </span>
@@ -1161,136 +1141,6 @@ export function AdminEditorPage({
             </section>
           </section>
 
-          <section className="panel-section">
-            <SectionHeader
-              eyebrow="Reactions"
-              title="리액션 수정"
-              description="유튜브 반응의 노출 제목, 소개글, 메인 추천 여부와 노출 순서를 수정합니다."
-            />
-
-            <div className="admin-card-list">
-              {reactionDrafts.map((reaction) => (
-                <article key={reaction.youtubeVideoId} className="admin-card">
-                  <div className="admin-card__head">
-                    <div>
-                      <p className="admin-card__title">{reaction.displayTitle}</p>
-                      <p className="admin-card__subtitle">원문: {reaction.originalTitle}</p>
-                      {reaction.localizedTitle ? (
-                        <p className="admin-card__subtitle">
-                          자동 번역({reaction.localizedTitleSource ?? "machine"}):{" "}
-                          {reaction.localizedTitle}
-                        </p>
-                      ) : null}
-                      <p className="admin-card__subtitle">
-                        {reaction.categoryNameKo} · {reaction.contentTitleKo} · {reaction.channelName}
-                      </p>
-                    </div>
-                    <div className="admin-card__badges">
-                      <span className="admin-badge">
-                        조회수 {formatCompactNumber(reaction.viewCount)}
-                      </span>
-                      <span className="admin-badge">
-                        댓글 {formatCompactNumber(reaction.commentCount)}
-                      </span>
-                      <span className="admin-badge">
-                        {formatKoreanDate(reaction.publishedAt)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="admin-card__grid">
-                    <label className="admin-field admin-field--full">
-                      <span className="admin-field__label">노출 제목</span>
-                      <input
-                        className="admin-input"
-                        placeholder={reaction.localizedTitle ?? reaction.originalTitle}
-                        value={reaction.adminTitle ?? ""}
-                        onChange={(event) =>
-                          handleReactionChange(reaction.id, "adminTitle", event.target.value)
-                        }
-                      />
-                    </label>
-                    <label className="admin-field admin-field--full">
-                      <span className="admin-field__label">노출 소개글</span>
-                      <textarea
-                        className="admin-textarea"
-                        placeholder={
-                          reaction.localizedDescription ??
-                          reaction.originalDescription ??
-                          "메인에서 보여줄 요약 소개를 입력하세요."
-                        }
-                        rows={3}
-                        value={reaction.adminDescription ?? ""}
-                        onChange={(event) =>
-                          handleReactionChange(
-                            reaction.id,
-                            "adminDescription",
-                            event.target.value,
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="admin-checkbox">
-                      <input
-                        checked={reaction.isFeatured}
-                        type="checkbox"
-                        onChange={(event) =>
-                          handleReactionChange(reaction.id, "isFeatured", event.target.checked)
-                        }
-                      />
-                      <span>메인 추천 노출</span>
-                    </label>
-                    <label className="admin-field admin-field--compact">
-                      <span className="admin-field__label">노출 순서</span>
-                      <input
-                        className="admin-input"
-                        type="number"
-                        value={reaction.featuredOrder}
-                        onChange={(event) =>
-                          handleReactionChange(
-                            reaction.id,
-                            "featuredOrder",
-                            Number(event.target.value),
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <div className="admin-section__actions">
-                    <a
-                      className="chip-button chip-button--ghost"
-                      href={reaction.youtubeUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      유튜브 원본 보기
-                    </a>
-                    <button
-                      className="chip-button chip-button--solid"
-                      disabled={savingKey === `reaction-${reaction.id}`}
-                      type="button"
-                      onClick={() =>
-                        void runWithSaving(`reaction-${reaction.id}`, async () => {
-                          await apiClient.updateAdminReaction(reaction.youtubeVideoId, {
-                            adminTitle: normalizeOptionalText(reaction.adminTitle ?? ""),
-                            adminDescription: normalizeOptionalText(
-                              reaction.adminDescription ?? "",
-                            ),
-                            isFeatured: reaction.isFeatured,
-                            featuredOrder: reaction.featuredOrder,
-                          });
-                          await refreshDashboard();
-                        })
-                      }
-                    >
-                      리액션 저장
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         </>
       ) : null}
     </div>

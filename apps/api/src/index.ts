@@ -15,7 +15,6 @@ import {
   saveAdminHomeSettings,
   updateAdminCategory,
   updateAdminContent,
-  updateAdminReaction,
 } from "./repositories/admin-repository";
 import { getAdminUserByLoginId } from "./repositories/admin-auth-repository";
 import {
@@ -322,16 +321,6 @@ const parseContentPayload = (payload: Record<string, unknown>) => ({
   }) as number,
   heroMessageKo: optionalStringField(payload.heroMessageKo),
   status: parseContentStatusField(payload.status),
-});
-
-const parseReactionPayload = (payload: Record<string, unknown>) => ({
-  adminTitle: optionalStringField(payload.adminTitle),
-  adminDescription: optionalStringField(payload.adminDescription),
-  isFeatured: parseBooleanField(payload.isFeatured, false),
-  featuredOrder: parseIntegerField(payload.featuredOrder, "硫붿씤 ?몄텧 ?쒖꽌", {
-    fallback: 0,
-    min: 0,
-  }) as number,
 });
 
 app.get("/", (c) =>
@@ -814,35 +803,6 @@ app.delete("/api/admin/contents/:id", async (c) => {
   return c.json({
     ok: true,
     id: contentId,
-  });
-});
-
-app.put("/api/admin/reactions/:youtubeVideoId", async (c) => {
-  await loadAdminProfile(c);
-  c.header("Cache-Control", "no-store");
-
-  const youtubeVideoId = c.req.param("youtubeVideoId");
-
-  if (!youtubeVideoId) {
-    throw new HTTPException(400, {
-      message: "유튜브 영상 ID가 필요합니다.",
-    });
-  }
-
-  const payload = parseReactionPayload(await readJsonBody(c));
-  const updated = await updateAdminReaction(c.env.DB, youtubeVideoId, payload);
-
-  if (!updated) {
-    throw new HTTPException(404, {
-      message: "수정할 리액션 영상을 찾을 수 없습니다.",
-    });
-  }
-
-  await bumpCacheVersion(c.env.CONTENT_CACHE);
-
-  return c.json({
-    ok: true,
-    youtubeVideoId,
   });
 });
 

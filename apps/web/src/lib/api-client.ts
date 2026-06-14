@@ -281,24 +281,6 @@ export const apiClient = {
       credentials: "include",
       timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
     }),
-  updateAdminReaction: (
-    youtubeVideoId: string,
-    payload: {
-      adminTitle: string | null;
-      adminDescription: string | null;
-      isFeatured: boolean;
-      featuredOrder: number;
-    },
-  ) =>
-    request<{ ok: boolean; youtubeVideoId: string }>(
-      `/api/admin/reactions/${encodeURIComponent(youtubeVideoId)}`,
-      {
-        method: "PUT",
-        credentials: "include",
-        body: payload,
-        timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
-      },
-    ),
 };
 
 export type { AdminProfile };

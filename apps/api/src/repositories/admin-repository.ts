@@ -2,16 +2,13 @@ import type {
   AdminContent,
   AdminContentDetail,
   AdminDashboardPayload,
-  AdminReactionVideo,
   Category,
   ContentStatus,
   HomeSiteCopy,
-  TranslationSource,
 } from "@awesomekorea/shared";
 
 import { parseJsonArray, toBoolean, toNullableString, toNumber, toStringValue } from "../lib/serializers";
 import {
-  getFeaturedHomeReactions,
   getHomeSiteCopy,
   upsertHomeSiteCopy,
 } from "./site-settings-repository";
@@ -49,49 +46,6 @@ interface AdminContentDetailRow extends AdminContentSummaryRow {
   thumbnailUrl: string | null;
 }
 
-interface AdminReactionRow {
-  adminDescription: string | null;
-  adminTitle: string | null;
-  categoryNameKo: string;
-  categorySlug: string;
-  channelName: string;
-  commentCount: number;
-  contentId: number;
-  contentSlug: string;
-  contentTitleKo: string;
-  displayTitle: string;
-  featuredOrder: number;
-  id: number;
-  isFeatured: number;
-  likeCount: number;
-  localizedDescription: string | null;
-  localizedDescriptionSource: string | null;
-  localizedTitle: string | null;
-  localizedTitleSource: string | null;
-  originalDescription: string | null;
-  originalTitle: string;
-  publishedAt: string;
-  thumbnailUrl: string | null;
-  viewCount: number;
-  youtubeUrl: string;
-  youtubeVideoId: string;
-}
-
-const toTranslationSource = (
-  value: unknown,
-): TranslationSource | null => {
-  if (
-    value === "manual" ||
-    value === "youtube_localized" ||
-    value === "machine" ||
-    value === "original"
-  ) {
-    return value;
-  }
-
-  return null;
-};
-
 const mapCategory = (row: AdminCategoryRow): Category => ({
   id: toNumber(row.id),
   slug: toStringValue(row.slug),
@@ -124,34 +78,6 @@ const mapAdminContentDetail = (row: AdminContentDetailRow): AdminContentDetail =
   searchKeywords: parseJsonArray(row.searchKeywordsJson),
   priorityScore: toNumber(row.priorityScore),
   heroMessageKo: toNullableString(row.heroMessageKo),
-});
-
-const mapAdminReaction = (row: AdminReactionRow): AdminReactionVideo => ({
-  id: toNumber(row.id),
-  youtubeVideoId: toStringValue(row.youtubeVideoId),
-  contentId: toNumber(row.contentId),
-  contentSlug: toStringValue(row.contentSlug),
-  contentTitleKo: toStringValue(row.contentTitleKo),
-  categorySlug: toStringValue(row.categorySlug),
-  categoryNameKo: toStringValue(row.categoryNameKo),
-  channelName: toStringValue(row.channelName),
-  originalTitle: toStringValue(row.originalTitle),
-  localizedTitle: toNullableString(row.localizedTitle),
-  localizedTitleSource: toTranslationSource(row.localizedTitleSource),
-  originalDescription: toNullableString(row.originalDescription),
-  localizedDescription: toNullableString(row.localizedDescription),
-  localizedDescriptionSource: toTranslationSource(row.localizedDescriptionSource),
-  adminTitle: toNullableString(row.adminTitle),
-  adminDescription: toNullableString(row.adminDescription),
-  displayTitle: toStringValue(row.displayTitle),
-  thumbnailUrl: toNullableString(row.thumbnailUrl),
-  publishedAt: toStringValue(row.publishedAt),
-  viewCount: toNumber(row.viewCount),
-  likeCount: toNumber(row.likeCount),
-  commentCount: toNumber(row.commentCount),
-  youtubeUrl: toStringValue(row.youtubeUrl),
-  isFeatured: toBoolean(row.isFeatured),
-  featuredOrder: toNumber(row.featuredOrder),
 });
 
 const normalizeAliases = (aliases: string[]) =>
@@ -623,128 +549,17 @@ export const deleteAdminContent = async (
   return true;
 };
 
-export const getAdminReactions = async (
-  db: D1Database,
-  options: {
-    featuredOnly?: boolean;
-    limit?: number;
-  } = {},
-): Promise<AdminReactionVideo[]> => {
-  const filters = ["rv.is_overseas_reaction = 1"];
-  const bindings: unknown[] = [];
-
-  if (options.featuredOnly) {
-    filters.push("rv.is_featured_home = 1");
-  }
-
-  const limit = options.limit ?? 60;
-
-  const result = await db
-    .prepare(
-      `
-        SELECT
-          rv.id AS id,
-          rv.youtube_video_id AS youtubeVideoId,
-          rv.content_id AS contentId,
-          c.slug AS contentSlug,
-          c.title_ko AS contentTitleKo,
-          cat.slug AS categorySlug,
-          cat.name_ko AS categoryNameKo,
-          ch.title AS channelName,
-          rv.title AS originalTitle,
-          rv.description AS originalDescription,
-          rv.localized_title AS localizedTitle,
-          rv.localized_title_source AS localizedTitleSource,
-          rv.localized_description AS localizedDescription,
-          rv.localized_description_source AS localizedDescriptionSource,
-          rv.admin_title AS adminTitle,
-          rv.admin_description AS adminDescription,
-          COALESCE(rv.admin_title, rv.localized_title, rv.title) AS displayTitle,
-          rv.thumbnail_url AS thumbnailUrl,
-          rv.published_at AS publishedAt,
-          rv.view_count AS viewCount,
-          rv.like_count AS likeCount,
-          rv.comment_count AS commentCount,
-          rv.youtube_url AS youtubeUrl,
-          rv.is_featured_home AS isFeatured,
-          rv.featured_home_order AS featuredOrder
-        FROM reaction_videos rv
-        JOIN contents c
-          ON c.id = rv.content_id
-        JOIN categories cat
-          ON cat.id = c.category_id
-        JOIN channels ch
-          ON ch.id = rv.channel_id
-        WHERE ${filters.join(" AND ")}
-        ORDER BY
-          rv.is_featured_home DESC,
-          CASE WHEN rv.featured_home_order = 0 THEN 9999 ELSE rv.featured_home_order END ASC,
-          rv.published_at DESC,
-          rv.id DESC
-        LIMIT ?
-      `,
-    )
-    .bind(...bindings, limit)
-    .all<AdminReactionRow>();
-
-  return (result.results ?? []).map(mapAdminReaction);
-};
-
-export const updateAdminReaction = async (
-  db: D1Database,
-  youtubeVideoId: string,
-  input: {
-    adminDescription: string | null;
-    adminTitle: string | null;
-    featuredOrder: number;
-    isFeatured: boolean;
-  },
-): Promise<boolean> => {
-  const result = await db
-    .prepare(
-      `
-        UPDATE reaction_videos
-        SET
-          admin_title = ?,
-          admin_description = ?,
-          is_featured_home = ?,
-          featured_home_order = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE youtube_video_id = ?
-      `,
-    )
-    .bind(
-      input.adminTitle,
-      input.adminDescription,
-      input.isFeatured ? 1 : 0,
-      input.isFeatured ? input.featuredOrder : 0,
-      youtubeVideoId,
-    )
-    .run();
-
-  return wasRowAffected(result);
-};
-
 export const getAdminDashboard = async (db: D1Database): Promise<AdminDashboardPayload> => {
-  const [settings, categories, contents, featuredReactions, reactions] = await Promise.all([
+  const [settings, categories, contents] = await Promise.all([
     getHomeSiteCopy(db),
     getAdminCategories(db),
     getAdminContents(db),
-    getAdminReactions(db, {
-      featuredOnly: true,
-      limit: 12,
-    }),
-    getAdminReactions(db, {
-      limit: 80,
-    }),
   ]);
 
   return {
     settings,
     categories,
     contents,
-    featuredReactions,
-    reactions,
   };
 };
 

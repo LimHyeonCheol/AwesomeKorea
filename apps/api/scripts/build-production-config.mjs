@@ -10,6 +10,7 @@ const outputDir = path.join(appDir, ".wrangler");
 const outputPath = path.join(outputDir, "deploy.production.jsonc");
 const repoNodeModulesPath = path.resolve(appDir, "..", "..", "node_modules", "wrangler", "config-schema.json");
 const workerEntryPath = path.resolve(appDir, "src", "index.ts");
+const migrationsDirPath = path.resolve(appDir, "migrations");
 
 const requireEnvValue = (key, fallback = "") => {
   const value = process.env[key]?.trim() ?? fallback;
@@ -47,6 +48,7 @@ export const buildProductionConfig = () => {
         database_id: databaseId,
         database_name: databaseName,
         preview_database_id: previewDatabaseId,
+        migrations_dir: path.relative(outputDir, migrationsDirPath).replace(/\\/g, "/"),
       },
     ],
     kv_namespaces: [

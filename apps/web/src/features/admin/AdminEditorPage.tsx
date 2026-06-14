@@ -821,7 +821,7 @@ export function AdminEditorPage({
                         />
                       </div>
 
-                      <div className="admin-grid__cell">
+                      <div className="admin-grid__cell admin-grid__cell--stack">
                         <select
                           className="admin-select"
                           value={content.status}
@@ -836,11 +836,6 @@ export function AdminEditorPage({
                           <option value="active">active</option>
                           <option value="hidden">hidden</option>
                         </select>
-                      </div>
-
-                      <div className="admin-grid__cell admin-grid__cell--muted">저장 후 집계</div>
-
-                      <div className="admin-grid__cell admin-grid__cell--actions admin-grid__cell--sticky-action">
                         <button
                           className="chip-button chip-button--solid admin-grid__save-button"
                           disabled={savingKey === `content-${content.id}`}
@@ -849,6 +844,12 @@ export function AdminEditorPage({
                         >
                           신규 저장
                         </button>
+                      </div>
+
+                      <div className="admin-grid__cell admin-grid__cell--muted">저장 후 집계</div>
+
+                      <div className="admin-grid__cell admin-grid__cell--actions admin-grid__cell--sticky-action admin-grid__cell--muted">
+                        상세는 저장 후
                       </div>
                     </div>
                   ) : (

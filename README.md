@@ -246,7 +246,7 @@ npm run dev:web
 5. 브라우저에서 `http://127.0.0.1:5173/admin` 접속
 6. `admin / dlaguscjfWkd` 로그인
 7. 카테고리 섹션에서 `+`로 임시 행 추가, `-`로 저장 전 행 제거, 체크박스 + `선택 삭제`로 삭제 확인
-8. 콘텐츠 섹션에서 `+`로 신규 행 추가 후 우측 고정 `신규 저장` 버튼으로 저장하고, 기존 행 클릭 시 섹션 아래 상세 패널이 열리는지 확인
+8. 콘텐츠 섹션에서 `+`로 신규 행 추가 후 상태 셀 아래 `신규 저장` 버튼으로 저장하고, 기존 행 클릭 시 섹션 아래 상세 패널이 열리는지 확인
 9. 콘텐츠 상세 패널에서 메타데이터 수정 후 `상세 저장`, 체크박스 + `선택 삭제`로 삭제 확인
 
 어드민 화면 동작 방식:
@@ -263,7 +263,7 @@ npm run dev:web
   - `GET /api/admin/contents/:id`
   - `PUT /api/admin/contents/:id`
   - `DELETE /api/admin/contents/:id`
-- 신규 콘텐츠 행은 그리드 마지막 `작업` 칼럼의 `신규 저장` 버튼으로 `POST /api/admin/contents`를 호출하고, 저장 이후 상세 내용은 같은 섹션 아래 상세 패널에서 `PUT /api/admin/contents/:id`로 반영합니다.
+- 신규 콘텐츠 행은 상태 셀 아래 `신규 저장` 버튼으로 `POST /api/admin/contents`를 호출하고, 저장 이후 상세 내용은 같은 섹션 아래 상세 패널에서 `PUT /api/admin/contents/:id`로 반영합니다.
 - 콘텐츠 상세 수정 패널은 화면 이동 대신 콘텐츠 섹션 아래에서 show/hide 됩니다.
 - 카테고리 삭제는 연결된 콘텐츠가 없을 때만 허용되고, 연결된 콘텐츠가 있으면 `409`를 반환합니다.
 - 콘텐츠 삭제 시 해당 콘텐츠에 연결된 `reaction_videos`, `editorial_entries`, `ranking_snapshots`를 함께 정리합니다.

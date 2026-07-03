@@ -194,7 +194,7 @@
 }
 
 .admin-grid__table--contents {
-  min-width: 1520px;
+  min-width: 1660px;
 }
 
 .admin-grid__header,
@@ -230,6 +230,7 @@
     minmax(12rem, 1.2fr)
     minmax(8rem, 0.8fr)
     minmax(10rem, 0.9fr)
+    minmax(8.5rem, 0.85fr)
     8.5rem;
 }
 
@@ -292,6 +293,9 @@
 }
 
 .admin-grid__cell--actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
   justify-self: end;
 }
 
@@ -358,6 +362,93 @@
 .admin-grid__save-button {
   min-width: 6.5rem;
   justify-content: center;
+}
+
+.admin-grid__sync-button {
+  min-width: 6.5rem;
+  justify-content: center;
+}
+
+.admin-sync-panel {
+  margin-top: 1rem;
+  padding: 1.2rem;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(135deg, rgba(255, 241, 242, 0.92), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.admin-sync-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-sync-panel__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--color-accent);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-sync-panel__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.admin-sync-panel__summary {
+  margin: 0.8rem 0 0;
+  color: var(--color-text-strong);
+  line-height: 1.6;
+}
+
+.admin-sync-panel__badges,
+.admin-sync-panel__steps,
+.admin-sync-panel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.admin-sync-panel__steps,
+.admin-sync-panel__meta {
+  margin-top: 0.9rem;
+}
+
+.admin-sync-panel__errors {
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: rgba(190, 24, 93, 0.08);
+  color: #9f1239;
+}
+
+.admin-sync-panel__errors p {
+  margin: 0;
+}
+
+.admin-sync-panel__errors p + p {
+  margin-top: 0.5rem;
+}
+
+.admin-badge--sync-running {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+}
+
+.admin-badge--sync-success {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.admin-badge--sync-error {
+  background: rgba(225, 29, 72, 0.14);
+  color: #be123c;
 }
 
 .admin-detail-panel {
@@ -482,7 +573,8 @@
 
   .admin-header__inner,
   .admin-section-head,
-  .admin-detail-panel__header {
+  .admin-detail-panel__header,
+  .admin-sync-panel__head {
     flex-direction: column;
   }
 

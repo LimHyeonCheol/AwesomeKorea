@@ -6,6 +6,7 @@ import type {
   AdminProfile,
   Category,
   ContentStatus,
+  InternalJobResult,
 } from "@awesomekorea/shared";
 
 import { SectionHeader } from "../../components/common/SectionHeader";
@@ -31,6 +32,17 @@ interface AdminEditorPageProps {
   admin: AdminProfile;
   onSessionExpired: () => void;
   refreshKey: number;
+}
+
+interface ContentSyncFeedback {
+  contentId: number;
+  contentSlug: string;
+  contentTitle: string;
+  finishedAt: string | null;
+  phase: "running" | "success" | "error";
+  rankingsRebuilt: boolean;
+  result: InternalJobResult | null;
+  summary: string;
 }
 
 const toEditableContentDetail = (content: AdminContentDetail): EditableContentDetail => ({
@@ -105,7 +117,9 @@ export function AdminEditorPage({
   refreshKey,
 }: AdminEditorPageProps) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [syncingContentId, setSyncingContentId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [contentSyncFeedback, setContentSyncFeedback] = useState<ContentSyncFeedback | null>(null);
   const [categoryDrafts, setCategoryDrafts] = useState<CategoryDraft[]>([]);
   const [contentDrafts, setContentDrafts] = useState<ContentDraft[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
@@ -509,6 +523,64 @@ export function AdminEditorPage({
     });
   };
 
+  const handleSyncContent = async (content: ContentDraft) => {
+    if (content.isNew) {
+      return;
+    }
+
+    setActionError(null);
+    setSyncingContentId(content.id);
+    setContentSyncFeedback({
+      contentId: content.id,
+      contentSlug: content.slug,
+      contentTitle: content.titleKo,
+      finishedAt: null,
+      phase: "running",
+      rankingsRebuilt: false,
+      result: null,
+      summary: "검색어 조회, 영상 저장, 랭킹 갱신 여부를 확인하고 있습니다.",
+    });
+
+    try {
+      const response = await apiClient.syncAdminContentYoutube(content.id);
+
+      setContentSyncFeedback({
+        contentId: content.id,
+        contentSlug: response.contentSlug,
+        contentTitle: content.titleKo,
+        finishedAt: new Date().toISOString(),
+        phase: response.ok ? "success" : "error",
+        rankingsRebuilt: response.rankingsRebuilt,
+        result: response.result,
+        summary: response.result.summary,
+      });
+
+      await refreshDashboard();
+
+      if (openContentId === content.id) {
+        await loadContentDetail(content.id);
+      }
+    } catch (error) {
+      if (isApiRequestError(error, 401)) {
+        onSessionExpired();
+        return;
+      }
+
+      setContentSyncFeedback({
+        contentId: content.id,
+        contentSlug: content.slug,
+        contentTitle: content.titleKo,
+        finishedAt: new Date().toISOString(),
+        phase: "error",
+        rankingsRebuilt: false,
+        result: null,
+        summary: error instanceof Error ? error.message : "수동 수집 요청을 처리하지 못했습니다.",
+      });
+    } finally {
+      setSyncingContentId(null);
+    }
+  };
+
   return (
     <div className="page-stack">
       <section className="panel-section admin-summary">
@@ -735,6 +807,7 @@ export function AdminEditorPage({
                   <span>출시</span>
                   <span>상태</span>
                   <span>리액션</span>
+                  <span>수집</span>
                   <span>작업</span>
                 </div>
 
@@ -839,6 +912,7 @@ export function AdminEditorPage({
                       </div>
 
                       <div className="admin-grid__cell admin-grid__cell--muted">저장 후 집계</div>
+                      <div className="admin-grid__cell admin-grid__cell--muted">-</div>
 
                       <div className="admin-grid__cell admin-grid__cell--actions admin-grid__cell--sticky-action">
                         <button
@@ -891,6 +965,19 @@ export function AdminEditorPage({
                       <div className="admin-grid__cell admin-grid__cell--muted">
                         {content.reactionCount}개 / {formatCompactNumber(content.totalViews)}
                       </div>
+                      <div className="admin-grid__cell admin-grid__cell--actions" onClick={stopRowToggle}>
+                        <button
+                          className="chip-button chip-button--ghost admin-grid__sync-button"
+                          disabled={syncingContentId !== null}
+                          type="button"
+                          onClick={(event) => {
+                            stopRowToggle(event);
+                            void handleSyncContent(content);
+                          }}
+                        >
+                          {syncingContentId === content.id ? "수집 중..." : "수동 수집"}
+                        </button>
+                      </div>
                       <div className="admin-grid__cell admin-grid__cell--sticky-action">
                         <span className="admin-grid__detail-indicator">
                           {openContentId === content.id ? "열림" : "열기"}
@@ -901,6 +988,70 @@ export function AdminEditorPage({
                 )}
               </div>
             </div>
+
+            {contentSyncFeedback ? (
+              <section className="admin-sync-panel">
+                <div className="admin-sync-panel__head">
+                  <div>
+                    <p className="admin-sync-panel__eyebrow">YouTube Sync</p>
+                    <h3 className="admin-sync-panel__title">
+                      {contentSyncFeedback.contentTitle} 수집{" "}
+                      {contentSyncFeedback.phase === "running"
+                        ? "진행"
+                        : contentSyncFeedback.phase === "success"
+                          ? "결과"
+                          : "실패"}
+                    </h3>
+                  </div>
+                  <div className="admin-sync-panel__badges">
+                    <span className={`admin-badge admin-badge--sync admin-badge--sync-${contentSyncFeedback.phase}`}>
+                      {contentSyncFeedback.phase === "running"
+                        ? "진행 중"
+                        : contentSyncFeedback.phase === "success"
+                          ? "완료"
+                          : "실패"}
+                    </span>
+                    <span className="admin-badge admin-badge--sync-slug">
+                      {contentSyncFeedback.contentSlug}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="admin-sync-panel__summary">{contentSyncFeedback.summary}</p>
+
+                {contentSyncFeedback.phase === "running" ? (
+                  <div className="admin-sync-panel__steps">
+                    <span className="admin-badge">1. 검색어 조회</span>
+                    <span className="admin-badge">2. 영상 저장</span>
+                    <span className="admin-badge">3. 랭킹/캐시 반영</span>
+                  </div>
+                ) : null}
+
+                {contentSyncFeedback.result ? (
+                  <div className="admin-sync-panel__meta">
+                    <span className="admin-badge">처리 {contentSyncFeedback.result.processedCount}개</span>
+                    <span className="admin-badge">업데이트 {contentSyncFeedback.result.updatedCount}건</span>
+                    <span className="admin-badge">스킵 {contentSyncFeedback.result.skippedCount}건</span>
+                    <span className="admin-badge">
+                      랭킹 반영 {contentSyncFeedback.rankingsRebuilt ? "완료" : "변경 없음"}
+                    </span>
+                    {contentSyncFeedback.finishedAt ? (
+                      <span className="admin-badge">
+                        완료 {formatKoreanDate(contentSyncFeedback.finishedAt)}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {contentSyncFeedback.result?.errors.length ? (
+                  <div className="admin-sync-panel__errors">
+                    {contentSyncFeedback.result.errors.map((errorMessage) => (
+                      <p key={errorMessage}>{errorMessage}</p>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
             <section className="admin-detail-panel">
               <div className="admin-detail-panel__header">

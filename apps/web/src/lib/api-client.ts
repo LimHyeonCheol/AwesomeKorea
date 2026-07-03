@@ -1,4 +1,5 @@
 import type {
+  AdminContentSyncResponse,
   AdminContentDetailPayload,
   AdminDashboardPayload,
   AdminProfile,
@@ -23,6 +24,7 @@ const DEV_PREVIEW_ENABLED =
   import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_PREVIEW === "true";
 const ADMIN_API_TIMEOUT_MS = 8_000;
 const ADMIN_MUTATION_TIMEOUT_MS = 12_000;
+const ADMIN_SYNC_TIMEOUT_MS = 120_000;
 const DEFAULT_REQUEST_ERROR_MESSAGE = "요청을 처리하지 못했습니다.";
 
 export class ApiRequestError extends Error {
@@ -280,6 +282,12 @@ export const apiClient = {
       method: "DELETE",
       credentials: "include",
       timeoutMs: ADMIN_MUTATION_TIMEOUT_MS,
+    }),
+  syncAdminContentYoutube: (contentId: number) =>
+    request<AdminContentSyncResponse>(`/api/admin/contents/${contentId}/sync-youtube`, {
+      method: "POST",
+      credentials: "include",
+      timeoutMs: ADMIN_SYNC_TIMEOUT_MS,
     }),
 };
 

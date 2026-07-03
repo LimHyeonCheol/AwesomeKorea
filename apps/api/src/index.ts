@@ -806,6 +806,44 @@ app.delete("/api/admin/contents/:id", async (c) => {
   });
 });
 
+app.post("/api/admin/contents/:id/sync-youtube", async (c) => {
+  await loadAdminProfile(c);
+  c.header("Cache-Control", "no-store");
+
+  const contentId = parseIntegerField(c.req.param("id"), "콘텐츠 ID", {
+    min: 1,
+  }) as number;
+  const item = await getAdminContentDetail(c.env.DB, contentId);
+
+  if (!item) {
+    throw new HTTPException(404, {
+      message: "수집할 콘텐츠를 찾을 수 없습니다.",
+    });
+  }
+
+  const result = await syncYoutubeReactions(c.env, {
+    contentSlug: item.slug,
+    limitPerKeyword: 5,
+    maxContents: 1,
+  });
+
+  let rankingsRebuilt = false;
+
+  if (result.updatedCount > 0) {
+    await rebuildRankings(c.env.DB);
+    await bumpCacheVersion(c.env.CONTENT_CACHE);
+    rankingsRebuilt = true;
+  }
+
+  return c.json({
+    ok: result.success,
+    contentId,
+    contentSlug: item.slug,
+    rankingsRebuilt,
+    result,
+  });
+});
+
 app.post("/internal/sync/youtube", async (c) => {
   assertInternalToken(c);
   c.header("Cache-Control", "no-store");

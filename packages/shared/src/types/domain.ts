@@ -237,6 +237,14 @@ export interface AdminContentDetailPayload {
   item: AdminContentDetail;
 }
 
+export interface AdminContentSyncResponse {
+  ok: boolean;
+  contentId: number;
+  contentSlug: string;
+  rankingsRebuilt: boolean;
+  result: InternalJobResult;
+}
+
 export interface AdminDashboardPayload {
   settings: HomeSiteCopy;
   categories: Category[];

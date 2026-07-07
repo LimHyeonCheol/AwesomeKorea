@@ -9,11 +9,6 @@
   "vars": {
     "APP_ENV": "local"
   },
-  "triggers": {
-    "crons": [
-      "0 * * * *"
-    ]
-  },
   "kv_namespaces": [
     {
       "binding": "CONTENT_CACHE",

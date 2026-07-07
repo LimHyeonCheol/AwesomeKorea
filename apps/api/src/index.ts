@@ -915,19 +915,9 @@ app.onError((error, c) => {
 
 const worker: ExportedHandler<AppBindings["Bindings"]> = {
   fetch: app.fetch,
-  scheduled: async (_controller, env, ctx) => {
-    ctx.waitUntil(
-      (async () => {
-        const syncResult = await syncYoutubeReactions(env, {
-          limitPerKeyword: 5,
-        });
-        const rankingResult = await rebuildRankings(env.DB);
-
-        if (syncResult.updatedCount > 0 || rankingResult.updatedCount > 0) {
-          await bumpCacheVersion(env.CONTENT_CACHE);
-        }
-      })(),
-    );
+  scheduled: async () => {
+    // Automatic cron collection is disabled until the search quota strategy is redesigned.
+    return;
   },
 };
 
